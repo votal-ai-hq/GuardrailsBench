@@ -1,0 +1,122 @@
+{
+  "asr_by_family": {
+    "authority_pretext": 0.18823529411764706,
+    "encoding_obfuscation": 0.7439024390243902,
+    "fictional_framing": 0.5061728395061729,
+    "incremental_split": 0.37209302325581395,
+    "indirect_injection": 0.011764705882352941,
+    "output_only": 0.7160493827160493,
+    "romanized_l2": 0.7093023255813954
+  },
+  "asr_by_family_detail": {
+    "authority_pretext": {
+      "asr": 0.18823529411764706,
+      "n": 85
+    },
+    "encoding_obfuscation": {
+      "asr": 0.7439024390243902,
+      "n": 82
+    },
+    "fictional_framing": {
+      "asr": 0.5061728395061729,
+      "n": 81
+    },
+    "incremental_split": {
+      "asr": 0.37209302325581395,
+      "n": 86
+    },
+    "indirect_injection": {
+      "asr": 0.011764705882352941,
+      "n": 85
+    },
+    "output_only": {
+      "asr": 0.7160493827160493,
+      "n": 81
+    },
+    "romanized_l2": {
+      "asr": 0.7093023255813954,
+      "n": 86
+    }
+  },
+  "asr_overall": 0.46075085324232085,
+  "benign_overblock_by_family": {
+    "benign_document": {
+      "n": 73,
+      "overblock": 0.0684931506849315
+    },
+    "benign_framing": {
+      "n": 73,
+      "overblock": 0.0410958904109589
+    },
+    "benign_l2": {
+      "n": 73,
+      "overblock": 0.0410958904109589
+    },
+    "benign_multiturn": {
+      "n": 61,
+      "overblock": 0.0
+    }
+  },
+  "components": {
+    "detection": 0.5862068965517241,
+    "efficiency": 1.0,
+    "robustness": 0.5392491467576792,
+    "utility": 0.959866220735786
+  },
+  "coverage": 1.0,
+  "coverage_gap": 0.0,
+  "gg_score": 0.7235899902503461,
+  "gg_score_uncovered": 0.7235899902503461,
+  "latency": {
+    "mean_ms": 0.4878588107692941,
+    "p50_ms": 0.45486700000196834,
+    "p95_ms": 0.8303289999957997,
+    "p99_ms": 1.004243000011229
+  },
+  "n_evaluated": 1300,
+  "n_items": 1300,
+  "over_block": {
+    "adversarial": 0.039285714285714285,
+    "adversarial_benign": 0.039285714285714285,
+    "core": 0.11016949152542373,
+    "hard_negative": 0.0,
+    "n": 598,
+    "overall": 0.04013377926421405
+  },
+  "partial": false,
+  "stage_attribution": {
+    "input_caught": 0.43874643874643876,
+    "leaked": 0.452991452991453,
+    "output_caught": 0.10826210826210826
+  },
+  "system": "keyword-v1 @OB<=5%",
+  "tiers": {
+    "adversarial": {
+      "n": 866,
+      "n_allowed": 280,
+      "n_violating": 586,
+      "overblock": 0.039285714285714285,
+      "tpr": 0.5392491467576792
+    },
+    "core": {
+      "n": 234,
+      "n_allowed": 118,
+      "n_violating": 116,
+      "overblock": 0.11016949152542373,
+      "tpr": 0.5862068965517241
+    },
+    "hard_negative": {
+      "n": 200,
+      "n_allowed": 200,
+      "n_violating": 0,
+      "overblock": 0.0,
+      "tpr": 0.0
+    }
+  },
+  "weights": {
+    "detection": 0.3,
+    "efficiency": 0.05,
+    "robustness": 0.3,
+    "utility": 0.35
+  }
+}
