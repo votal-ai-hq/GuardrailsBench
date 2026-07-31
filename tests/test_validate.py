@@ -152,3 +152,25 @@ def test_shortcut_auc_is_direction_free():
     long_allowed = [_it(f"a{i}", "a much longer question " * 10, LABEL_ALLOWED)
                     for i in range(5)]
     assert shortcut_auc(short_violating + long_allowed, "prompt") == 1.0
+
+
+def test_effective_n_separates_items_from_distinct_renderings():
+    """A templated tier reports a rate over its item count, but the precision of
+    that rate is set by distinct renderings and by clusters."""
+    from guardrailgym.validate import effective_n
+    items = [_it(f"h{i}", "the one and only template rendering", LABEL_ALLOWED,
+                 TIER_HARD_NEGATIVE, cluster=7) for i in range(50)]
+    eff = effective_n(items + _healthy())
+    assert eff[TIER_HARD_NEGATIVE] == {"items": 50, "distinct": 1, "clusters": 1}
+    assert eff[TIER_CORE]["distinct"] == eff[TIER_CORE]["items"]
+
+
+def test_the_shipped_hard_negative_tier_is_thinner_than_its_item_count(dataset):
+    """Documents a known limitation of the committed dataset: four of the eight
+    hard-negative templates carry no variable slots, so 200 items collapse to a
+    handful of strings in four clusters."""
+    from guardrailgym.validate import effective_n
+    hn = effective_n(dataset)[TIER_HARD_NEGATIVE]
+    assert hn["items"] == 200
+    assert hn["distinct"] < 40, "if this grows, the templates were fixed"
+    assert hn["clusters"] == 4

@@ -82,8 +82,26 @@ def leaderboard_markdown(entries: list[tuple[str, dict]],
     return "\n".join(lines).rstrip() + "\n"
 
 
+def effective_n_note(eff: dict) -> str:
+    """Spell out where a column has fewer distinct items than it appears to.
+
+    A tier built from templates reports a rate over its item count, but the
+    precision of that rate is set by distinct renderings — and under a
+    cluster-disjoint split, by clusters.
+    """
+    thin = [(tier, n) for tier, n in eff.items() if n["clusters"] < 20]
+    if not thin:
+        return ""
+    parts = "; ".join(f"`{tier}` is {n['items']} items but {n['distinct']} distinct "
+                      f"renderings in {n['clusters']} clusters" for tier, n in thin)
+    return (f"- **Effective sample size**: {parts}. Rates over those tiers are far "
+            f"less precise than the item counts suggest, and a held-out system "
+            f"meets their templates all-or-nothing.\n")
+
+
 def provenance(data_path, n_items: int, max_overblock: float,
-               train_path=None, n_folds: int = 5) -> str:
+               train_path=None, n_folds: int = 5, eff: dict | None = None,
+               incumbent_csv=None) -> str:
     """The note under the table. A leaderboard without its operating point and
     its train/eval arrangement is not reproducible, and not comparable."""
     how = (f"a held-out split (`{train_path}`)" if train_path else
@@ -97,9 +115,14 @@ def provenance(data_path, n_items: int, max_overblock: float,
         f"measured on held-out items, so they can and do exceed the budget — that "
         f"gap is how far the operating point fails to generalise.\n"
         f"- **Fitting and calibration**: {how}.\n"
-        f"- `incumbent-replay` is absent: it replays the shipped guardrail's "
-        f"recorded verdicts, which live in the seed CSV and are not in this "
-        f"repository. Run it with `--incumbent-csv`.\n"
+        f"{effective_n_note(eff or {})}"
+        + (f"- `incumbent-replay` replays the shipped guardrail's recorded "
+           f"verdicts from `{incumbent_csv}`. It covers the core tier only: "
+           f"adversarial items inherit `origin_id` from the seed row they came "
+           f"from, and reusing that verdict for transformed text would be a "
+           f"fabricated result.\n" if incumbent_csv else
+           "- `incumbent-replay` is absent: it replays the shipped guardrail's "
+           "recorded verdicts from the seed CSV. Run it with `--incumbent-csv`.\n")
     )
 
 

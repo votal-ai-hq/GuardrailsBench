@@ -24,6 +24,7 @@ from .schema import (
     TIER_ADVERSARIAL,
     TIER_CORE,
     TIER_HARD_NEGATIVE,
+    TIERS,
     Item,
 )
 
@@ -136,6 +137,28 @@ def validate_dataset(items: list[Item]) -> list[str]:
             problems.append(f"{i.item_id}: cluster {i.cluster_id} != base "
                             f"{base} cluster {by_id[base].cluster_id} — split leakage")
     return problems
+
+
+def effective_n(items: list[Item]) -> dict:
+    """Distinct renderings per tier, next to the raw item count.
+
+    A rate is only as precise as the number of *distinct* things it was measured
+    over, and templated tiers inflate the raw count. `clusters` is the harsher
+    number: duplicate renderings of one template share a cluster, so a
+    cluster-disjoint split moves them as a block and a held-out system sees a
+    tier's templates all-or-nothing.
+    """
+    out = {}
+    for tier in TIERS:
+        group = [i for i in items if i.tier == tier]
+        if not group:
+            continue
+        out[tier] = {
+            "items": len(group),
+            "distinct": len({(i.input_text, i.response) for i in group}),
+            "clusters": len({i.cluster_id for i in group}),
+        }
+    return out
 
 
 def validate_splits(dev: list[Item], test: list[Item]) -> list[str]:

@@ -181,3 +181,20 @@ def test_leaderboard_renders_the_footer_only_when_given_one():
     assert "---" not in plain, "the horizontal rule belongs to the footer"
     with_footer = leaderboard_markdown([("s", r)], footer="a note").splitlines()
     assert with_footer[-2:] == ["", "a note"]
+
+
+def test_provenance_reflects_whether_the_incumbent_actually_ran():
+    from guardrailgym.report import provenance
+    absent = provenance("data/test.jsonl", 1300, 0.05)
+    assert "is absent" in absent
+    present = provenance("data/test.jsonl", 1300, 0.05,
+                         incumbent_csv="data/seed/seed.csv")
+    assert "is absent" not in present and "data/seed/seed.csv" in present
+
+
+def test_effective_n_note_only_fires_on_thin_tiers():
+    from guardrailgym.report import effective_n_note
+    assert effective_n_note({"core": {"items": 234, "distinct": 234, "clusters": 230}}) == ""
+    thin = effective_n_note({"hard_negative": {"items": 200, "distinct": 33,
+                                               "clusters": 4}})
+    assert "200 items but 33 distinct renderings in 4 clusters" in thin

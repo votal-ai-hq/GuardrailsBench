@@ -48,7 +48,12 @@ def cmd_build(args) -> int:
 
 
 def cmd_validate(args) -> int:
-    problems = validate_mod.validate_dataset(_load(args.data))
+    items = _load(args.data)
+    print(f"{'tier':<16}{'items':>8}{'distinct':>10}{'clusters':>10}")
+    for tier, n in validate_mod.effective_n(items).items():
+        print(f"{tier:<16}{n['items']:>8}{n['distinct']:>10}{n['clusters']:>10}")
+    print()
+    problems = validate_mod.validate_dataset(items)
     for p in problems:
         print(f"FAIL {p}")
     print(f"{'FAIL' if problems else 'OK'}: {args.data} ({len(problems)} problems)")
@@ -95,7 +100,9 @@ def cmd_leaderboard(args) -> int:
             report.write_result_json(out_dir / f"{slug}.metrics.json", label, result)
 
     footer = report.provenance(args.data, len(eval_items), args.max_overblock,
-                               args.train, args.folds)
+                               args.train, args.folds,
+                               validate_mod.effective_n(eval_items),
+                               args.incumbent_csv)
     md = report.leaderboard_markdown(entries, footer)
     Path(args.out).write_text(md)
     print(md)

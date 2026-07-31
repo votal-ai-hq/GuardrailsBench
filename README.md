@@ -24,8 +24,9 @@ nothing because they skip one of them:
 pip install -e ".[dev]"
 
 python -m guardrailgym validate --data data/test.jsonl        # dataset gates
-python -m guardrailgym eval --system keyword-v1               # one system
-python -m guardrailgym leaderboard --out LEADERBOARD.md       # the table
+python -m guardrailgym eval --system keyword-v1 --train data/dev.jsonl
+python -m guardrailgym leaderboard --train data/dev.jsonl \
+    --incumbent-csv data/seed/custom_policy_5k_llmshield.csv
 pytest
 ```
 
@@ -34,12 +35,17 @@ Current results are in [LEADERBOARD.md](LEADERBOARD.md); the scoring model is in
 
 ## What is in the dataset
 
-`data/test.jsonl` — 1300 items in three tiers:
+`data/test.jsonl` (1300 items) and `data/dev.jsonl` (752), cluster-disjoint,
+both built from `data/seed/custom_policy_5k_llmshield.csv`. The build is
+reproducible byte for byte — `tests/test_reproducibility.py` rebuilds both files
+from the seed and compares.
+
+The test split, in three tiers:
 
 | tier | n | what it is |
 |---|---|---|
 | `core` | 234 | clean, in-distribution, length-matched, both labels |
-| `hard_negative` | 200 | policy-*adjacent* and allowed: the compliance officer asking about insider-trading controls |
+| `hard_negative` | 200 | policy-*adjacent* and allowed: the compliance officer asking about insider-trading controls. **Known limitation: 33 distinct strings in 4 clusters** — see below |
 | `adversarial` | 866 | seven attack families (586 violating) and four benign mirror families (280 allowed) |
 
 Each item is a conversation, a model response, and a label. Both stages are
@@ -76,11 +82,31 @@ dropped — `tests/test_attacks.py` holds every family to that rule.
 All systems are compared at a fixed over-block budget (`@OB<=5%`), because any
 detection number can be bought with over-block and vice versa.
 
-With a dev split, pass `--train data/dev.jsonl`. Without one, the harness falls
-back to cluster-disjoint 5-fold cross-validation over the eval set, so nothing
-is ever scored by a model that saw its cluster — including its paraphrases and
-its obfuscated restatements, which stage 1 of the build keeps in the same
-cluster.
+`--train data/dev.jsonl` fits and calibrates on the held-out split. Without it
+the harness falls back to cluster-disjoint 5-fold cross-validation over the eval
+set, so nothing is ever scored by a model that saw its cluster — including its
+paraphrases and its obfuscated restatements, which stage 1 of the build keeps in
+the same cluster.
+
+The two modes give materially different answers, and the published leaderboard
+uses held-out. Under cross-validation `tfidf-lr-v1` leads on 0.755; under
+held-out training it over-blocks 89% of benign mirrors and drops to 0.682,
+behind `keyword-v1`. Generalising an operating point across splits is most of
+the problem, and cross-validation hides how much.
+
+### Known limitation: the hard-negative tier is thin
+
+`make_hard_negatives` renders 400 items from 8 templates, but four of those
+templates carry no variable slots, so each is duplicated 50 times. The result is
+85 distinct strings overall, and because a template is one cluster, the split
+gives dev 4 templates and test the other 4.
+
+Two consequences: `hard-neg over-block` is a rate over 4 template groups, not
+200 items; and no held-out system can generalise there, which is most of why
+`tfidf-lr-v1` over-blocks 100% of them. `guardrailgym validate` prints
+items/distinct/clusters per tier, and the leaderboard footer carries the caveat.
+Fixing it means authoring more templates with real variation, which changes
+`data/test.jsonl` and invalidates any prior leaderboard.
 
 ## Adding a system
 
