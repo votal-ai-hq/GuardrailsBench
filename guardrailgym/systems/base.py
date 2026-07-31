@@ -28,6 +28,14 @@ class Guardrail:
         """Optional training hook. Called with training items only."""
         return self
 
+    def prepare(self, items: list[Item]) -> None:
+        """Optional warm-up, called with the items about to be screened.
+
+        Remote systems use this to issue their calls concurrently; screening
+        itself stays a simple per-item loop.
+        """
+        return None
+
     def calibrate(self, items: list[Item],
                   max_overblock: float = DEFAULT_MAX_OVERBLOCK) -> Guardrail:
         """Optional operating-point hook. Called with calibration items only."""
@@ -56,7 +64,14 @@ def _quantile_threshold(scores: list[float], alpha: float) -> float:
     s = sorted(scores)
     k = math.floor(alpha * len(s))
     if k <= 0:
-        return s[-1] + 1.0          # block nothing
+        # Block nothing *in the calibration set* — which is not the same as
+        # blocking nothing. The threshold sits immediately above the riskiest
+        # legitimate item seen, so anything scoring higher than every known-good
+        # item is still caught. Returning max + 1.0 here used to wave through a
+        # whole band of scores riskier than anything legitimate, and with tied
+        # scores (integer lexicon counts, constant-score stubs) it collapsed the
+        # operating point straight from block-everything to block-nothing.
+        return math.nextafter(s[-1], math.inf)
     return s[len(s) - k]
 
 

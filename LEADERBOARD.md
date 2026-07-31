@@ -3,7 +3,7 @@
 | System | GG-Score | core TPR | ASR | benign over-block | hard-neg over-block | p95 ms |
 |---|---|---|---|---|---|---|
 | keyword-v1 @OB<=5% | 0.773 | 0.716 | 0.408 | 0.054 | 0.000 | 0.6 |
-| tfidf-lr-v1 @OB<=5% | 0.682 | 1.000 | 0.000 | 0.889 | 1.000 | 4.2 |
+| tfidf-lr-v1 @OB<=5% | 0.682 | 1.000 | 0.000 | 0.889 | 1.000 | 4.5 |
 | CONTROL-length-stump @OB<=5% | 0.373 | 0.000 | 0.976 | 0.161 | 0.000 | 0.0 |
 | incumbent-replay (PARTIAL: core only) | 0.166 | 1.000 | — | — | — | 7172.0 |
 

@@ -13,3 +13,6 @@ reports/*.traces.jsonl
 
 # dev + test combined; regenerate with `guardrailgym build`
 data/all.jsonl
+
+# http-api response cache
+.cache/

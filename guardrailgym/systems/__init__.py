@@ -10,6 +10,7 @@ from collections.abc import Callable
 
 from .base import DEFAULT_MAX_OVERBLOCK, Guardrail, ScoreGuardrail
 from .control import AllowAll, BlockAll, LengthStump
+from .http_api import HttpConfig, HttpGuardrail
 from .incumbent import IncumbentReplay
 from .keyword import KeywordGuardrail
 from .tfidf_lr import TfidfLRGuardrail
@@ -37,6 +38,6 @@ def get(name: str) -> Callable[[], Guardrail]:
 
 __all__ = [
     "DEFAULT_MAX_OVERBLOCK", "DEFAULT_SYSTEMS", "REGISTRY", "AllowAll", "BlockAll",
-    "Guardrail", "IncumbentReplay", "KeywordGuardrail", "LengthStump",
-    "ScoreGuardrail", "TfidfLRGuardrail", "get",
+    "Guardrail", "HttpConfig", "HttpGuardrail", "IncumbentReplay",
+    "KeywordGuardrail", "LengthStump", "ScoreGuardrail", "TfidfLRGuardrail", "get",
 ]

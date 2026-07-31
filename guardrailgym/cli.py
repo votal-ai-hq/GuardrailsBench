@@ -17,7 +17,12 @@ from . import validate as validate_mod
 from .metrics import score
 from .runner import evaluate
 from .schema import dump_traces, load_items
-from .systems import DEFAULT_MAX_OVERBLOCK, DEFAULT_SYSTEMS, IncumbentReplay
+from .systems import (
+    DEFAULT_MAX_OVERBLOCK,
+    DEFAULT_SYSTEMS,
+    HttpGuardrail,
+    IncumbentReplay,
+)
 
 
 def _load(path: str):
@@ -33,6 +38,14 @@ def _run_one(name: str, eval_items, train_items, args):
             raise SystemExit("incumbent-replay needs --incumbent-csv")
         system = IncumbentReplay(args.incumbent_csv)
         traces, system = evaluate(system, eval_items)
+    elif name == HttpGuardrail.name:
+        if not args.api_config:
+            raise SystemExit("http-api needs --api-config")
+        system = HttpGuardrail(args.api_config)
+        traces, system = evaluate(system, eval_items, train_items,
+                                  max_overblock=args.max_overblock)
+        if system.error_summary():
+            print(system.error_summary(), file=sys.stderr)
     else:
         traces, system = evaluate(systems.get(name), eval_items, train_items,
                                   n_folds=args.folds, max_overblock=args.max_overblock)
@@ -81,8 +94,10 @@ def cmd_leaderboard(args) -> int:
     eval_items = _load(args.data)
     train_items = _load(args.train) if args.train else None
     names = args.systems or list(DEFAULT_SYSTEMS)
-    if args.incumbent_csv:
+    if args.incumbent_csv and IncumbentReplay.name not in names:
         names = names + [IncumbentReplay.name]
+    if args.api_config and HttpGuardrail.name not in names:
+        names = names + [HttpGuardrail.name]
 
     entries = []
     out_dir = Path(args.reports) if args.reports else None
@@ -133,10 +148,14 @@ def build_parser() -> argparse.ArgumentParser:
     common.add_argument("--max-overblock", type=float, default=DEFAULT_MAX_OVERBLOCK)
     common.add_argument("--incumbent-csv", default=None,
                         help="seed CSV carrying the incumbent's recorded verdicts")
+    common.add_argument("--api-config", default=None,
+                        help="JSON config for the http-api system (see "
+                             "configs/http_api.example.json)")
 
     e = sub.add_parser("eval", parents=[common], help="run one guardrail")
     e.add_argument("--system", required=True,
-                   choices=sorted(systems.REGISTRY) + [IncumbentReplay.name])
+                   choices=sorted(systems.REGISTRY)
+                   + [IncumbentReplay.name, HttpGuardrail.name])
     e.add_argument("--out", default=None, help="directory for traces and metrics")
     e.set_defaults(func=cmd_eval)
 
