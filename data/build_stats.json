@@ -1,4 +1,5 @@
 {
+  "pack": "finance",
   "seed_rows": 4350,
   "clusters": 4254,
   "core": 332,

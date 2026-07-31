@@ -11,8 +11,6 @@ import random
 import pytest
 
 from guardrailgym.build import (
-    CATEGORY_MAP,
-    DROP_COLUMNS,
     build,
     cluster,
     ingest,
@@ -21,6 +19,7 @@ from guardrailgym.build import (
     make_hard_negatives,
     split,
 )
+from guardrailgym.pack import load_pack
 from guardrailgym.schema import (
     LABEL_ALLOWED,
     LABEL_VIOLATING,
@@ -41,7 +40,7 @@ def test_ingest_maps_labels_tiers_and_categories(raw):
     assert raw
     assert {i.label for i in raw} == {LABEL_VIOLATING, LABEL_ALLOWED}
     assert {i.tier for i in raw} == {TIER_CORE}
-    assert {i.category for i in raw} <= set(CATEGORY_MAP.values()) | {None}
+    assert {i.category for i in raw} <= set(load_pack().categories.values()) | {None}
     for it in raw:
         it.validate()
 
@@ -51,10 +50,11 @@ def test_ingest_drops_the_columns_that_leak_the_answer(raw, seed_csv):
     survive into an item — a stump on latency alone hit 70.7%."""
     with open(seed_csv) as f:
         header = f.readline().strip().split(",")
-    assert set(DROP_COLUMNS) <= set(header), "fixture should carry the leaky columns"
+    drop = load_pack().drop_columns
+    assert set(drop) <= set(header), "fixture should carry the leaky columns"
     for it in raw:
         blob = json.dumps(it.to_json())
-        for col in DROP_COLUMNS:
+        for col in drop:
             assert col not in blob
 
 
@@ -135,7 +135,7 @@ def test_build_end_to_end(seed_csv, tmp_path):
     assert json.loads((tmp_path / "build_stats.json").read_text()) == stats
     assert stats["total"] == stats["core"] + stats["hard_negative"] + stats["adversarial"]
     assert stats["dev"] + stats["test"] == stats["total"]
-    assert stats["dropped_columns"] == DROP_COLUMNS
+    assert stats["dropped_columns"] == load_pack().drop_columns
     assert set(stats["adv_by_family"]) >= {"fictional_framing", "output_only",
                                            "benign_framing"}
 

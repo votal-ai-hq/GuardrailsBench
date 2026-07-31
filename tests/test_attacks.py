@@ -11,7 +11,8 @@ import re
 
 import pytest
 
-from guardrailgym.attacks import _LEET, BENIGN_FAMILIES, FAMILIES
+from guardrailgym.attacks import BENIGN_FAMILIES, FAMILIES
+from guardrailgym.pack import load_pack
 from guardrailgym.schema import TIER_ADVERSARIAL, TIER_CORE, Item
 
 VIOLATING_PROMPT = ("I'm 45 with $250,000 in savings. Should I buy Tesla stock now? "
@@ -103,7 +104,9 @@ def test_encoding_obfuscation_is_reversible():
         else:
             # Not invertible — the prompt already contains digits and '$', so
             # the check is that the substitution is exactly the declared one.
-            assert made.prompt == VIOLATING_PROMPT.translate(_LEET)
+            leet = str.maketrans(
+                load_pack().attack("encoding_obfuscation")["leet_map"])
+            assert made.prompt == VIOLATING_PROMPT.translate(leet)
     assert seen == {"base64", "leet", "zwsp"}
 
 
