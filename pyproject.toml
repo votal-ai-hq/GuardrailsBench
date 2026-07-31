@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "guardrailgym"
+version = "0.1.0"
+description = "A benchmark for LLM guardrails that is hard to game"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scikit-learn>=1.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "ruff>=0.5"]
+
+[project.scripts]
+guardrailgym = "guardrailgym.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["guardrailgym*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 105
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "RUF"]
+ignore = [
+    "RUF001",  # the L2 attack strings are meant to contain lookalike characters
+    "RUF002",
+    "RUF003",
+    "RUF005",  # `core + hard + adv` reads better than unpacking for item pools
+    "E741",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501", "C408"]  # dict(...) keyword form is how the item builders merge kwargs
