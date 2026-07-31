@@ -131,14 +131,19 @@ and `leaderboard`. Calibration and cross-validation come for free; override
 ## Rebuilding the dataset
 
 ```bash
-python -m guardrailgym build --seed-csv path/to/seed.csv --out data/
+python -m guardrailgym build \
+    --seed-csv data/seed/custom_policy_5k_llmshield.csv --out data/
 ```
 
 Five stages: ingest (drops the columns that leak the label, including the
 incumbent's own verdicts), near-dup clustering, length matching, hard negatives,
-attack families, cluster-disjoint split. The seed CSV is not in this repository;
-`tests/fixtures/seed_sample.csv` is a small stand-in that exercises the pipeline
-end to end.
+attack families, cluster-disjoint split. Deterministic under `SEED = 1337` —
+this rewrites `data/dev.jsonl` and `data/test.jsonl` byte for byte.
+
+The seed corpus is 4350 rows and confirms what the pipeline is defending
+against: the incumbent misses 12 and over-blocks 3, `latency_ms` leaks the label
+(6572 ms mean on safe rows vs 4400 on unsafe), and prompt length leaks it the
+other way (92 vs 213 characters).
 
 ## Layout
 
@@ -152,6 +157,8 @@ guardrailgym/
   runner.py     execution, latency, cluster-disjoint cross-validation
   report.py     leaderboard rendering
   systems/      baselines
-tests/          130 tests; test_metrics.py pins the two scoring regressions
+data/seed/      the seed corpus the dataset is built from
+tests/          141 tests; test_metrics.py pins the two scoring regressions
+                test_reproducibility.py pins data/ to the seed corpus
 docs/METRICS.md the scoring model
 ```
