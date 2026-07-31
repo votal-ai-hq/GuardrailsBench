@@ -23,3 +23,14 @@ def dataset():
     if not TEST_JSONL.exists():
         pytest.skip("data/test.jsonl is not present")
     return load_items(TEST_JSONL)
+
+
+SEED_CORPUS = ROOT / "data" / "seed" / "custom_policy_5k_llmshield.csv"
+
+
+@pytest.fixture(scope="session")
+def seed_corpus():
+    """The real seed CSV. Skips rather than fails where it is not distributed."""
+    if not SEED_CORPUS.exists():
+        pytest.skip("the seed corpus is not present")
+    return str(SEED_CORPUS)

@@ -199,3 +199,37 @@ def test_evaluation_is_deterministic(dataset):
         runs.append((r["gg_score"], r["asr_by_family"], r["over_block"]["overall"],
                      r["tiers"]["core"]["tpr"]))
     assert runs[0] == runs[1]
+
+
+def test_evaluate_accepts_a_prebuilt_instance(seed_csv):
+    """incumbent-replay is constructed around a verdict file, so it reaches the
+    harness already built rather than as a factory."""
+    from guardrailgym.build import ingest
+    core = ingest(seed_csv)[:10]
+    system = IncumbentReplay(seed_csv)
+    traces, returned = evaluate(system, core)
+    assert returned is system
+    assert set(traces) == {i.item_id for i in core}
+
+
+def test_incumbent_replay_reads_a_bom_prefixed_csv(tmp_path):
+    """The seed export carries a UTF-8 BOM; pandas strips it and csv does not."""
+    path = tmp_path / "bom.csv"
+    path.write_text("﻿id,input_blocked,output_blocked,latency_ms\n"
+                    "7,yes,no,1234\n", encoding="utf-8")
+    system = IncumbentReplay(path)
+    assert 7 in system.verdicts
+
+
+def test_incumbent_replay_rejects_a_verdict_file_it_cannot_read(tmp_path):
+    """Abstaining on everything would otherwise render as an honest coverage gap
+    and publish a PARTIAL row that measured nothing."""
+    bad_header = tmp_path / "wrong.csv"
+    bad_header.write_text("row_id,verdict\n1,block\n")
+    with pytest.raises(ValueError, match="missing"):
+        IncumbentReplay(bad_header)
+
+    no_rows = tmp_path / "empty.csv"
+    no_rows.write_text("id,input_blocked,output_blocked\n")
+    with pytest.raises(ValueError, match="no rows"):
+        IncumbentReplay(no_rows)

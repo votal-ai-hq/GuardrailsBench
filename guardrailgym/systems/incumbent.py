@@ -33,12 +33,24 @@ class IncumbentReplay(Guardrail):
     def __init__(self, verdict_csv: str | Path) -> None:
         self.verdict_csv = Path(verdict_csv)
         self.verdicts: dict[int, dict] = {}
-        with open(self.verdict_csv, newline="") as f:
-            for row in csv.DictReader(f):
+        # utf-8-sig: the seed export carries a BOM, which pandas strips and the
+        # csv module does not — without this every row key is "﻿id".
+        with open(self.verdict_csv, newline="", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            missing = {"id", "input_blocked", "output_blocked"} - set(reader.fieldnames or [])
+            if missing:
+                raise ValueError(f"{self.verdict_csv}: verdict CSV is missing "
+                                 f"{sorted(missing)}; got {reader.fieldnames}")
+            for row in reader:
                 try:
                     self.verdicts[int(row["id"])] = row
-                except (KeyError, TypeError, ValueError):
+                except (TypeError, ValueError):
                     continue
+        # A verdict file that parses to nothing must fail loudly. Abstaining on
+        # every item would otherwise render as an honest coverage gap and quietly
+        # publish a PARTIAL row that measures nothing at all.
+        if not self.verdicts:
+            raise ValueError(f"{self.verdict_csv}: no rows with a usable integer id")
 
     def _row(self, item: Item) -> dict | None:
         if item.tier != TIER_CORE or item.origin_id is None:

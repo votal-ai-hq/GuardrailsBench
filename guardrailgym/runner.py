@@ -45,7 +45,15 @@ def run(system: Guardrail, items: list[Item]) -> dict[str, Trace]:
 
 
 def _needs_training(factory) -> bool:
-    cls = factory if isinstance(factory, type) else type(factory())
+    # `factory` may be a class, a callable returning one, or an already-built
+    # instance — incumbent-replay arrives built, because it is constructed
+    # around a verdict file.
+    if isinstance(factory, Guardrail):
+        cls = type(factory)
+    elif isinstance(factory, type):
+        cls = factory
+    else:
+        cls = type(factory())
     return (cls.fit is not Guardrail.fit) or (cls.calibrate is not Guardrail.calibrate)
 
 

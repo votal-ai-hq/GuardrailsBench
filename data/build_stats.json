@@ -1,0 +1,31 @@
+{
+  "seed_rows": 4350,
+  "clusters": 4254,
+  "core": 332,
+  "hard_negative": 400,
+  "adversarial": 1320,
+  "total": 2052,
+  "dev": 752,
+  "test": 1300,
+  "adv_by_family": {
+    "fictional_framing": 120,
+    "romanized_l2": 120,
+    "authority_pretext": 120,
+    "incremental_split": 120,
+    "encoding_obfuscation": 120,
+    "indirect_injection": 120,
+    "output_only": 120,
+    "benign_framing": 120,
+    "benign_l2": 120,
+    "benign_multiturn": 120,
+    "benign_document": 120
+  },
+  "dropped_columns": [
+    "latency_ms",
+    "llmshield_verdict",
+    "input_blocked",
+    "output_blocked",
+    "fired_policy",
+    "outcome"
+  ]
+}
