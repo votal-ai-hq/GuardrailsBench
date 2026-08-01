@@ -29,6 +29,7 @@ SEED = 1337
 def run(system: Guardrail, items: list[Item]) -> dict[str, Trace]:
     """Screen every item. Input stage first; output stage only if input allowed."""
     traces: dict[str, Trace] = {}
+    system.prepare(items)
     for it in items:
         custom = getattr(system, "trace", None)
         if callable(custom):
@@ -84,6 +85,7 @@ def evaluate(factory, eval_items: list[Item], train_items: list[Item] | None = N
         return run(system, eval_items), system
 
     if train_items:
+        system.prepare(train_items)
         system.fit(train_items)
         system.calibrate(train_items, max_overblock)
         return run(system, eval_items), system
@@ -94,6 +96,7 @@ def evaluate(factory, eval_items: list[Item], train_items: list[Item] | None = N
     for i, fold in enumerate(folds):
         held_in = [it for j, f in enumerate(folds) if j != i for it in f]
         last = factory()
+        last.prepare(held_in)
         last.fit(held_in)
         last.calibrate(held_in, max_overblock)
         traces.update(run(last, fold))

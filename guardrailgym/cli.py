@@ -15,9 +15,15 @@ from pathlib import Path
 from . import report, systems
 from . import validate as validate_mod
 from .metrics import score
+from .pack import DEFAULT_PACK, bundled_packs, load_pack
 from .runner import evaluate
 from .schema import dump_traces, load_items
-from .systems import DEFAULT_MAX_OVERBLOCK, DEFAULT_SYSTEMS, IncumbentReplay
+from .systems import (
+    DEFAULT_MAX_OVERBLOCK,
+    DEFAULT_SYSTEMS,
+    HttpGuardrail,
+    IncumbentReplay,
+)
 
 
 def _load(path: str):
@@ -33,8 +39,21 @@ def _run_one(name: str, eval_items, train_items, args):
             raise SystemExit("incumbent-replay needs --incumbent-csv")
         system = IncumbentReplay(args.incumbent_csv)
         traces, system = evaluate(system, eval_items)
+    elif name == HttpGuardrail.name:
+        if not args.api_config:
+            raise SystemExit("http-api needs --api-config")
+        system = HttpGuardrail(args.api_config)
+        traces, system = evaluate(system, eval_items, train_items,
+                                  max_overblock=args.max_overblock)
+        if system.error_summary():
+            print(system.error_summary(), file=sys.stderr)
     else:
-        traces, system = evaluate(systems.get(name), eval_items, train_items,
+        factory = systems.get(name)
+        pack = load_pack(getattr(args, "pack", DEFAULT_PACK))
+        if getattr(factory, "takes_pack", False):
+            def factory(_cls=factory, _pack=pack):
+                return _cls(_pack)
+        traces, system = evaluate(factory, eval_items, train_items,
                                   n_folds=args.folds, max_overblock=args.max_overblock)
     return traces, system, score(eval_items, traces)
 
@@ -42,8 +61,27 @@ def _run_one(name: str, eval_items, train_items, args):
 def cmd_build(args) -> int:
     from .build import build
     stats = build(args.seed_csv, args.out, per_family=args.per_family,
-                  n_hard_neg=args.hard_negatives)
+                  n_hard_neg=args.hard_negatives, pack=args.pack)
     print(json.dumps(stats, indent=2))
+    return 0
+
+
+def cmd_packs(args) -> int:
+    if not args.pack:
+        for name in bundled_packs():
+            pack = load_pack(name)
+            print(f"{name:<14}{pack.description.strip().splitlines()[0]}")
+        return 0
+    pack = load_pack(args.pack)
+    print(f"{pack.name}  ({pack.source})\n{pack.description.strip()}\n")
+    print(f"  seed columns    {pack.columns}")
+    print(f"  labels          {pack.seed['label_values']}")
+    print(f"  categories      {sorted(pack.categories.values())}")
+    print(f"  dropped         {pack.drop_columns}")
+    print(f"  hard negatives  {len(pack.hard_negatives['templates'])} templates")
+    print(f"  attack families {sorted(k for k in pack.attacks if k != 'slots')}")
+    print("  lexicon rules   " + ", ".join(
+        f"{k}={len(v)}" for k, v in pack.lexicon.items() if isinstance(v, list)))
     return 0
 
 
@@ -81,8 +119,10 @@ def cmd_leaderboard(args) -> int:
     eval_items = _load(args.data)
     train_items = _load(args.train) if args.train else None
     names = args.systems or list(DEFAULT_SYSTEMS)
-    if args.incumbent_csv:
+    if args.incumbent_csv and IncumbentReplay.name not in names:
         names = names + [IncumbentReplay.name]
+    if args.api_config and HttpGuardrail.name not in names:
+        names = names + [HttpGuardrail.name]
 
     entries = []
     out_dir = Path(args.reports) if args.reports else None
@@ -118,7 +158,13 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--out", default="data")
     b.add_argument("--per-family", type=int, default=120)
     b.add_argument("--hard-negatives", type=int, default=400)
+    b.add_argument("--pack", default=DEFAULT_PACK,
+                   help=f"policy pack name or path; bundled: {bundled_packs()}")
     b.set_defaults(func=cmd_build)
+
+    k = sub.add_parser("packs", help="list bundled policy packs")
+    k.add_argument("--pack", default=None, help="describe one pack in detail")
+    k.set_defaults(func=cmd_packs)
 
     v = sub.add_parser("validate", help="check a built dataset")
     v.add_argument("--data", default="data/test.jsonl")
@@ -133,10 +179,16 @@ def build_parser() -> argparse.ArgumentParser:
     common.add_argument("--max-overblock", type=float, default=DEFAULT_MAX_OVERBLOCK)
     common.add_argument("--incumbent-csv", default=None,
                         help="seed CSV carrying the incumbent's recorded verdicts")
+    common.add_argument("--pack", default=DEFAULT_PACK,
+                        help="policy pack the lexicon baseline draws its rules from")
+    common.add_argument("--api-config", default=None,
+                        help="JSON config for the http-api system (see "
+                             "configs/http_api.example.json)")
 
     e = sub.add_parser("eval", parents=[common], help="run one guardrail")
     e.add_argument("--system", required=True,
-                   choices=sorted(systems.REGISTRY) + [IncumbentReplay.name])
+                   choices=sorted(systems.REGISTRY)
+                   + [IncumbentReplay.name, HttpGuardrail.name])
     e.add_argument("--out", default=None, help="directory for traces and metrics")
     e.set_defaults(func=cmd_eval)
 

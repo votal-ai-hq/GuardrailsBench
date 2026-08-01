@@ -78,6 +78,7 @@ dropped — `tests/test_attacks.py` holds every family to that rule.
 | `CONTROL-length-stump` | text length only — the shortcut probe |
 | `CONTROL-block-all` / `CONTROL-allow-all` | the degenerate corners |
 | `incumbent-replay` | the shipped guardrail's recorded verdicts (needs `--incumbent-csv`) |
+| `http-api` | any guardrail behind an HTTP endpoint (needs `--api-config`) |
 
 All systems are compared at a fixed over-block budget (`@OB<=5%`), because any
 detection number can be bought with over-block and vice versa.
@@ -107,6 +108,128 @@ Two consequences: `hard-neg over-block` is a rate over 4 template groups, not
 items/distinct/clusters per tier, and the leaderboard footer carries the caveat.
 Fixing it means authoring more templates with real variation, which changes
 `data/test.jsonl` and invalidates any prior leaderboard.
+
+## Porting to another policy domain
+
+The engine is domain-agnostic: `schema`, `metrics`, `runner`, `report` and the
+HTTP adapter contain no policy vocabulary at all, and a test asserts they stay
+that way. Everything domain-specific lives in a **policy pack** — one YAML file
+holding the seed-column mapping, the categories, the hard-negative templates,
+the text each attack family wraps a request in, and the keyword lexicon.
+
+```bash
+python -m guardrailgym packs                      # what is bundled
+python -m guardrailgym packs --pack healthcare    # what is in one
+python -m guardrailgym build --pack healthcare --seed-csv my_corpus.csv --out data/
+python -m guardrailgym eval --system keyword-v1 --pack healthcare --data data/test.jsonl
+```
+
+Two packs ship. `finance` is the original content, extracted unchanged —
+rebuilding from it reproduces `data/` byte for byte. `healthcare` exists to
+prove the boundary is in the right place: its seed CSV shares no column names,
+no label values and no categories with the finance one, and `tests/test_pack.py`
+builds a complete, gate-passing dataset from it.
+
+What a pack contains:
+
+| section | what it decides |
+|---|---|
+| `seed` | column names, label values, category mapping, which columns to drop because they leak |
+| `hard_negatives` | the policy-adjacent-but-allowed templates and their slot values |
+| `attacks` | per family: the frames, transliterated cores, pretexts, carriers, documents — plus the slot regexes that keep transforms specific rather than generic |
+| `lexicon` | the weighted rules and negations behind `keyword-v1` |
+
+What stays in code: the *shape* of each attack. Wrapping a violating request in
+a screenplay frame is domain-independent; which screenplay, and what counts as a
+violation, are not. Attack shape, scoring, calibration, the dataset gates and
+the harness are all pack-blind.
+
+The loader validates on load — a pack missing an attack family, a label value,
+or a `romanized_l2` core for its default category is rejected with the reason,
+rather than producing a quietly degenerate dataset.
+
+## Benchmarking a guardrail behind an HTTP API
+
+Point it at the endpoint with a JSON config — no code:
+
+```bash
+export GUARDRAIL_API_KEY=...
+cp configs/http_api.example.json configs/mine.json   # edit urls + json paths
+python -m guardrailgym eval --system http-api --api-config configs/mine.json \
+    --data data/test.jsonl --train data/dev.jsonl
+```
+
+```json
+{
+  "name": "my-guardrail",
+  "input_url":  "https://guard.example.com/v1/screen/input",
+  "output_url": "https://guard.example.com/v1/screen/output",
+  "headers":    {"Authorization": "Bearer ${GUARDRAIL_API_KEY}"},
+  "input_body":  {"messages": "{turns}", "context": "{context_text}"},
+  "output_body": {"prompt": "{prompt}", "completion": "{response}"},
+  "score_path":   "result.risk_score",
+  "blocked_path": "result.blocked",
+  "timeout_s": 20, "retries": 2, "concurrency": 8,
+  "cache_dir": ".cache/my-guardrail"
+}
+```
+
+Body templates take `{turns}` (the real list, for chat-shaped endpoints),
+`{prompt}`, `{user_text}`, `{context_text}`, `{input_text}`, `{response}`,
+`{item_id}`. Anything that isn't a placeholder passes through, so static fields
+survive. `${VAR}` in headers is read from the environment and fails loudly if
+unset — credentials never enter the repo, and never enter the cache either.
+
+Four things this handles that a naive loop does not:
+
+* **A failed call is not an allow.** Timeouts, 5xx, rate limits, and responses
+  that don't match `score_path` come back `NOT_EVALUABLE` and land in the
+  coverage gap. An endpoint that falls over on a third of the set cannot score
+  as though it passed them, and `error_summary()` says which failure it was.
+* **Latency is the real round trip**, recorded per call and fed to the
+  efficiency term. Cached replays report the *original* latency, never the cache
+  lookup.
+* **Re-runs are free.** Successful responses are cached on disk by request hash;
+  failures are not cached, so a transient outage doesn't freeze into a permanent
+  gap.
+* **Calls are concurrent** (`concurrency`), so 1300 items against a 500 ms
+  endpoint is under a minute rather than eleven.
+
+Set `score_path` if the endpoint returns a continuous risk score — that is what
+lets it be calibrated to the same `@OB<=5%` budget as every other row. With only
+`blocked_path` it has a fixed operating point, is not calibrated, and its row is
+labelled `@fixed`. Omitting `output_url` means the output stage is never
+screened, which is a finding, not a gap: `output_only` becomes uncatchable.
+
+## Running the tests
+
+```bash
+pytest                       # 182 tests, ~30s, no network
+ruff check .                 # lint
+python -m guardrailgym validate --data data/test.jsonl
+```
+
+CI (`.github/workflows/ci.yml`) runs those three on every push and PR against
+Python 3.11. Nothing reaches the network: the HTTP adapter tests start a real
+`ThreadingHTTPServer` on localhost, so timeouts, retries, concurrency and
+recorded latency are exercised for real rather than mocked.
+
+| file | what it covers |
+|---|---|
+| `test_metrics.py` | the two scoring regressions, unchanged as delivered |
+| `test_scoring.py` | GG-Score bounds, coverage scaling, per-tier rates, percentiles |
+| `test_schema.py` | item views, round-trips, malformed-item rejection |
+| `test_attacks.py` | every family: label/cluster preservation, diversity, reversibility |
+| `test_build.py` | all five build stages against a fixture seed CSV |
+| `test_reproducibility.py` | rebuilds `data/` from the real seed and compares byte for byte |
+| `test_systems.py` | calibration budgets, cross-validation disjointness, replay |
+| `test_http_api.py` | the HTTP adapter against a live localhost server |
+| `test_validate.py` | each dataset gate against the failure it was written for |
+| `test_cli.py` | every subcommand, leaderboard rendering, provenance footer |
+| `test_pack.py` | the domain boundary: a full dataset built from a second policy pack |
+
+Tests needing `data/` skip rather than fail when it is absent, so the suite
+still runs on a checkout without the corpus.
 
 ## Adding a system
 
@@ -158,7 +281,12 @@ guardrailgym/
   report.py     leaderboard rendering
   systems/      baselines
 data/seed/      the seed corpus the dataset is built from
-tests/          141 tests; test_metrics.py pins the two scoring regressions
+  systems/http_api.py  benchmark a guardrail behind an HTTP endpoint
+  pack.py       policy packs: the domain boundary
+  packs/        finance.yaml, healthcare.yaml
+configs/        example http-api config
+tests/          182 tests; test_metrics.py pins the two scoring regressions
                 test_reproducibility.py pins data/ to the seed corpus
+                test_pack.py builds a whole dataset from a second domain
 docs/METRICS.md the scoring model
 ```

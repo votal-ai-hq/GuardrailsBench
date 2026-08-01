@@ -1,0 +1,14 @@
+{
+  "name": "my-guardrail",
+  "input_url": "https://guard.example.com/v1/screen/input",
+  "output_url": "https://guard.example.com/v1/screen/output",
+  "headers": {"Authorization": "Bearer ${GUARDRAIL_API_KEY}"},
+  "input_body": {"messages": "{turns}", "context": "{context_text}"},
+  "output_body": {"prompt": "{prompt}", "completion": "{response}"},
+  "score_path": "result.risk_score",
+  "blocked_path": "result.blocked",
+  "timeout_s": 20,
+  "retries": 2,
+  "concurrency": 8,
+  "cache_dir": ".cache/my-guardrail"
+}
