@@ -30,6 +30,14 @@ endpoint does not mean writing a system:
       "cache_dir": ".cache/llmshield"
     }
 
+Works with anything reachable over HTTPS, on any infrastructure: it is a URL,
+headers, a body template and some JSON paths. OpenAI-shaped endpoints are the
+common case and all three variants are covered — ``/v1/moderations`` reads
+directly (``results.0.flagged``); ``/v1/chat/completions`` carries its verdict as
+a JSON *string*, so name that path in ``unwrap_json_at`` and the fields inside
+become addressable; a guard that answers in prose gets ``blocked_pattern``. See
+``configs/openai_*.example.json``.
+
 ``${VAR}`` in headers is expanded from the environment, so credentials stay out
 of the repo. Set ``score_path`` when the endpoint returns a continuous risk
 score — that is what lets it be calibrated to the same over-block budget as
@@ -93,6 +101,12 @@ class HttpConfig:
     output_body: dict = field(default_factory=lambda: {"text": "{response}"})
     score_path: str | None = None
     blocked_path: str | None = None
+    # OpenAI chat-completions and tool calls carry their payload as a JSON
+    # *string* inside the envelope. Naming that path unwraps it, after which
+    # score_path / blocked_path address the guardrail's own fields.
+    unwrap_json_at: str | None = None
+    # For guards that answer in prose ("UNSAFE", "block") rather than a boolean.
+    blocked_pattern: str | None = None
     timeout_s: float = 20.0
     retries: int = 2
     backoff_s: float = 1.0
@@ -108,6 +122,8 @@ class HttpConfig:
         cfg = cls(**raw)
         if not (cfg.score_path or cfg.blocked_path):
             raise ValueError(f"{path}: set score_path, blocked_path, or both")
+        if cfg.blocked_pattern and not cfg.blocked_path:
+            raise ValueError(f"{path}: blocked_pattern needs blocked_path to match against")
         return cfg
 
 
@@ -122,13 +138,20 @@ def render(template: dict, item: Item) -> dict:
         "input_text": item.input_text,
         "response": item.response,
     }
+    # A body value that is exactly one of these placeholders gets the structured
+    # conversation, not a string — OpenAI-shaped endpoints need the real list.
+    # `turns_with_response` appends the completion, which is what an
+    # output-stage screen has to see.
+    structured = {
+        "{turns}": lambda: item.turns,
+        "{turns_with_response}": lambda: [
+            *item.turns, {"role": "assistant", "content": item.response}],
+    }
+
     def fill(v):
         if isinstance(v, str):
-            # A body value that is exactly one placeholder for the turns gets the
-            # structured conversation, not a string — endpoints that take chat
-            # format need the real list.
-            if v == "{turns}":
-                return item.turns
+            if v in structured:
+                return structured[v]()
             return v.format(**slots)
         if isinstance(v, dict):
             return {k: fill(x) for k, x in v.items()}
@@ -279,10 +302,15 @@ class HttpGuardrail(ScoreGuardrail):
             self.errors[(item.item_id, stage)] = error or "no response"
             return Decision(False, None, REASON_NOT_EVALUABLE), latency
         try:
+            if self.cfg.unwrap_json_at:
+                payload = json.loads(dig(payload, self.cfg.unwrap_json_at))
             score = float(dig(payload, self.cfg.score_path)) if self.cfg.score_path else None
-            blocked = (_as_bool(dig(payload, self.cfg.blocked_path))
-                       if self.cfg.blocked_path else None)
-        except (KeyError, IndexError, TypeError, ValueError) as e:
+            blocked = None
+            if self.cfg.blocked_path:
+                raw = dig(payload, self.cfg.blocked_path)
+                blocked = (bool(re.search(self.cfg.blocked_pattern, str(raw)))
+                           if self.cfg.blocked_pattern else _as_bool(raw))
+        except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as e:
             # The endpoint answered in a shape the config does not match.
             self.errors[(item.item_id, stage)] = f"response did not match config: {e}"
             return Decision(False, None, REASON_NOT_EVALUABLE), latency

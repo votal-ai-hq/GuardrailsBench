@@ -176,11 +176,38 @@ python -m guardrailgym eval --system http-api --api-config configs/mine.json \
 }
 ```
 
-Body templates take `{turns}` (the real list, for chat-shaped endpoints),
+### The request/response contract
+
+**Request** — you write the body, so it is whatever your endpoint expects. Slots:
+`{turns}` and `{turns_with_response}` become the real message *list* (the second
+appends the completion, which is what an output-stage screen has to see);
 `{prompt}`, `{user_text}`, `{context_text}`, `{input_text}`, `{response}`,
-`{item_id}`. Anything that isn't a placeholder passes through, so static fields
-survive. `${VAR}` in headers is read from the environment and fails loudly if
-unset — credentials never enter the repo, and never enter the cache either.
+`{item_id}` are strings. Anything that isn't a placeholder passes through, so
+static fields like `model` and `temperature` survive.
+
+**Response** — dotted paths into the decoded JSON: `results.0.flagged`,
+`output.risk.score`. `unwrap_json_at` first parses a JSON *string* at a path,
+for envelopes that carry the verdict as text; `blocked_pattern` regex-matches a
+string, for guards that answer in prose.
+
+`${VAR}` in headers is read from the environment and fails loudly if unset —
+credentials never enter the repo, and never enter the cache either.
+
+### OpenAI-compatible endpoints
+
+All three common shapes work; ready-made configs are in `configs/`.
+
+| your endpoint | config | example |
+|---|---|---|
+| `/v1/moderations` | `blocked_path: results.0.flagged` | `openai_moderations.example.json` |
+| `/v1/chat/completions` returning JSON | `unwrap_json_at: choices.0.message.content` then `blocked_path: blocked` | `openai_chat.example.json` |
+| `/v1/chat/completions` returning prose | `blocked_path: choices.0.message.content` + `blocked_pattern` | `openai_chat_prose.example.json` |
+| tool/function call | `unwrap_json_at: choices.0.message.tool_calls.0.function.arguments` | — |
+
+Nothing is hardcoded to OpenAI: it is a URL, headers, a body template and some
+paths, so a bespoke JSON API on your own infra needs no more work than a
+provider-shaped one. `tests/test_http_api.py` exercises every row above against
+a real localhost server.
 
 Four things this handles that a naive loop does not:
 
