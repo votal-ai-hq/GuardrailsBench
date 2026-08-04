@@ -16,3 +16,6 @@ data/all.jsonl
 
 # http-api response cache
 .cache/
+
+# local credentials
+.env
