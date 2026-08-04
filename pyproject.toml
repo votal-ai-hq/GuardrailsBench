@@ -23,6 +23,7 @@ dev = ["pytest>=7.4", "ruff>=0.5"]
 guardrailgym = "guardrailgym.cli:main"
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["guardrailgym*"]
 
 [tool.setuptools.package-data]
@@ -30,6 +31,7 @@ guardrailgym = ["packs/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 addopts = "-q"
 
 [tool.ruff]

@@ -19,3 +19,7 @@ data/all.jsonl
 
 # local credentials
 .env
+
+# editable install metadata
+*.egg-info/
+src/*.egg-info/

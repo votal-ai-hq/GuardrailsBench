@@ -21,7 +21,7 @@ nothing because they skip one of them:
 ## Quick start
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev]"        # src layout: install once, then the CLI works
 
 python -m guardrailgym validate --data data/test.jsonl        # dataset gates
 python -m guardrailgym eval --system keyword-v1 --train data/dev.jsonl
@@ -271,7 +271,9 @@ other way (92 vs 213 characters).
 ## Layout
 
 ```
-guardrailgym/
+AGENTS.md       constraints to read before changing anything
+.env.example    the one credential the repo can consume
+src/guardrailgym/
   schema.py     Item / Decision / Trace
   build.py      the five build stages
   attacks.py    attack families and their benign mirrors
@@ -285,8 +287,9 @@ data/seed/      the seed corpus the dataset is built from
   pack.py       policy packs: the domain boundary
   packs/        finance.yaml, healthcare.yaml
 configs/        example http-api config
-tests/          182 tests; test_metrics.py pins the two scoring regressions
+tests/          182 unit tests; test_metrics.py pins the two scoring regressions
                 test_reproducibility.py pins data/ to the seed corpus
                 test_pack.py builds a whole dataset from a second domain
+evals/          golden cases + run_evals.py: the results, not the code
 docs/METRICS.md the scoring model
 ```

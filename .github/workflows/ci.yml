@@ -18,5 +18,9 @@ jobs:
         run: ruff check .
       - name: Dataset gates
         run: python -m guardrailgym validate --data data/test.jsonl
-      - name: Tests
+      - name: Unit tests
         run: pytest
+      # Golden-case evals: asserts the benchmark's *results* have not drifted,
+      # which the unit suite cannot see. Slower, so it runs last.
+      - name: Evals
+        run: python evals/run_evals.py

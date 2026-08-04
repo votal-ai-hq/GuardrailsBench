@@ -7,9 +7,11 @@ with the finance one, and check it comes out valid.
 """
 import json
 import random
+from pathlib import Path
 
 import pytest
 
+import guardrailgym
 from guardrailgym.attacks import FAMILIES, benign_families, families
 from guardrailgym.build import build, ingest, make_adversarial, make_hard_negatives
 from guardrailgym.pack import DEFAULT_PACK, PolicyPack, bundled_packs, load_pack
@@ -22,6 +24,7 @@ from guardrailgym.schema import (
 from guardrailgym.validate import effective_n, validate_dataset, validate_splits
 
 HEALTHCARE_SEED = "tests/fixtures/healthcare_seed.csv"
+PACKAGE = Path(guardrailgym.__file__).parent
 
 
 def test_both_packs_are_bundled_and_load():
@@ -33,7 +36,7 @@ def test_both_packs_are_bundled_and_load():
 
 
 def test_packs_can_be_loaded_by_path_and_are_cached(tmp_path):
-    by_path = PolicyPack.load("guardrailgym/packs/finance.yaml")
+    by_path = PolicyPack.load(PACKAGE / "packs" / "finance.yaml")
     assert by_path.name == "finance"
     assert load_pack("finance") is load_pack("finance"), "packs are immutable content"
 
@@ -70,12 +73,11 @@ def _finance_dict():
 def test_the_engine_carries_no_domain_vocabulary():
     """If a policy word creeps back into the engine, the boundary has moved."""
     import re
-    from pathlib import Path
     domain = re.compile(r"invest|ticker|Tesla|portfolio|insider|FinAssist|mortgage|"
                         r"metformin|patient|clinical|HIPAA", re.I)
     for module in ("schema.py", "metrics.py", "runner.py", "report.py",
                    "systems/http_api.py", "systems/base.py", "systems/control.py"):
-        text = Path("guardrailgym") / module
+        text = PACKAGE / module
         offenders = [line.strip() for line in text.read_text().splitlines()
                      if domain.search(line)]
         assert not offenders, f"{module} grew domain vocabulary: {offenders[:2]}"

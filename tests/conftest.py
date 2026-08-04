@@ -4,8 +4,11 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+SRC = ROOT / "src"
+# src layout: importable straight from a checkout, no install required.
+for path in (SRC, ROOT):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
 FIXTURES = Path(__file__).parent / "fixtures"
 SEED_CSV = FIXTURES / "seed_sample.csv"
