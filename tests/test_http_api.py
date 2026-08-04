@@ -251,7 +251,11 @@ def test_the_cache_never_contains_credentials(server, tmp_path, monkeypatch):
 def test_prepare_issues_calls_concurrently(server):
     server.behaviour = "slow"          # 0.5s each; 12 calls serially is 6s
     guard = HttpGuardrail(_cfg(server, concurrency=8, timeout_s=10))
-    items = [_item(f"i{i}") for i in range(6)]
+    # Distinct text per item: identical requests are deduplicated to a single
+    # call by design, which would leave nothing here to run in parallel.
+    items = [_item(f"i{i}", f"Should I buy stock number {i} right now?",
+                   f"I would put all of it into number {i} today, without question.")
+             for i in range(6)]
     t0 = time.perf_counter()
     guard.prepare(items)
     elapsed = time.perf_counter() - t0
@@ -274,3 +278,42 @@ def test_it_plugs_into_the_standard_harness(server):
     assert result["coverage"] == 1.0
     assert result["tiers"][TIER_CORE]["tpr"] == 1.0
     assert result["latency"]["p95_ms"] > 0
+
+
+def test_identical_items_issue_one_call_and_do_not_race_the_cache(server, tmp_path):
+    """Regression: N items with the same text render to the same request, so
+    prepare() had N threads write the same cache file at once. The torn result
+    was invalid JSON that only failed under load — CI caught it, local runs did
+    not. Fixed by an atomic rename plus one in-flight call per distinct request.
+    """
+    cache = tmp_path / "cache"
+    guard = HttpGuardrail(_cfg(server, cache_dir=str(cache), concurrency=8))
+    # Same text, different ids — exactly the shape of a templated tier.
+    items = [_item(f"same{i}", "overdraft fees", "fine", "allowed") for i in range(24)]
+
+    guard.prepare(items)
+    assert len(server.seen) == 2, \
+        f"24 identical items should be 1 input + 1 output call, got {len(server.seen)}"
+
+    written = list(cache.glob("*.json"))
+    assert len(written) == 2
+    for f in written:
+        json.loads(f.read_text())          # torn writes raise JSONDecodeError here
+    assert not list(cache.glob("*.tmp")), "temp files must be renamed away"
+
+    traces = run(guard, items)
+    assert all(t.evaluable for t in traces.values())
+
+
+def test_a_second_process_reads_the_cache_written_by_the_first(server, tmp_path):
+    """The atomic write has to be readable, not just well-formed in memory."""
+    cfg = _cfg(server, cache_dir=str(tmp_path / "cache"), concurrency=8)
+    first = HttpGuardrail(cfg)
+    items = [_item(f"same{i}", "overdraft fees", "fine", "allowed") for i in range(12)]
+    first.prepare(items)
+    calls = len(server.seen)
+
+    second = HttpGuardrail(cfg)
+    second.prepare(items)
+    assert len(server.seen) == calls, "everything should have come from the cache"
+    assert second.client.cache_hits == 2

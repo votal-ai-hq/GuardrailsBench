@@ -43,6 +43,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -150,15 +151,18 @@ class HttpClient:
         self.calls = 0
         self.cache_hits = 0
 
-    def _key(self, url: str, body: dict) -> str:
-        # Headers are deliberately excluded: a cache file must never be a place
-        # an API key can end up, and rotating a key should not void the cache.
+    def request_key(self, url: str, body: dict) -> str:
+        """Identity of a request. Two items with identical text share one.
+
+        Headers are deliberately excluded: a cache file must never be a place an
+        API key can end up, and rotating a key should not void the cache.
+        """
         blob = json.dumps({"url": url, "body": body}, sort_keys=True)
         return hashlib.sha256(blob.encode()).hexdigest()
 
     def call(self, url: str, body: dict) -> tuple[dict | None, float, str | None]:
         """Returns (payload, latency_ms, error). payload is None on failure."""
-        key = self._key(url, body)
+        key = self.request_key(url, body)
         path = self.cache_dir / f"{key}.json" if self.cache_dir else None
         if path and path.exists():
             cached = json.loads(path.read_text())
@@ -188,8 +192,15 @@ class HttpClient:
         if path and payload is not None:
             # Only successes are cached. A cached failure would silently freeze a
             # transient outage into a permanent coverage gap.
-            path.write_text(json.dumps({"payload": payload, "latency_ms": latency,
-                                        "error": None}))
+            #
+            # Written via a unique temp file and renamed, because os.replace is
+            # atomic: a reader either sees the old file or the whole new one,
+            # never a half-written mixture. Two threads writing the same path
+            # directly produced torn JSON that only failed under load.
+            tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+            tmp.write_text(json.dumps({"payload": payload, "latency_ms": latency,
+                                       "error": None}))
+            os.replace(tmp, path)
         return payload, latency, error
 
 
@@ -206,6 +217,13 @@ class HttpGuardrail(ScoreGuardrail):
         self.name = self.cfg.name
         self.client = HttpClient(self.cfg)
         self._results: dict[tuple[str, str], tuple[dict | None, float, str | None]] = {}
+        # prepare() runs these concurrently, so everything below is shared state.
+        # Items with identical text render to an identical request; without the
+        # per-request lock they would issue N calls for one answer and race each
+        # other writing the same cache file.
+        self._lock = threading.Lock()
+        self._request_locks: dict[str, threading.Lock] = {}
+        self._by_request: dict[str, tuple[dict | None, float, str | None]] = {}
         # Why each item went unevaluable. A coverage gap you cannot diagnose is
         # not actionable — "the endpoint returned 429" and "the config points at
         # a field the endpoint does not return" need different fixes.
@@ -217,10 +235,26 @@ class HttpGuardrail(ScoreGuardrail):
         if not url:
             return None, 0.0, None      # stage not configured; nothing was asked
         key = (item.item_id, stage)
-        if key not in self._results:
-            template = self.cfg.input_body if stage == "input" else self.cfg.output_body
-            self._results[key] = self.client.call(url, render(template, item))
-        return self._results[key]
+        with self._lock:
+            if key in self._results:
+                return self._results[key]
+
+        template = self.cfg.input_body if stage == "input" else self.cfg.output_body
+        body = render(template, item)
+        request_id = self.client.request_key(url, body)
+        with self._lock:
+            request_lock = self._request_locks.setdefault(request_id, threading.Lock())
+
+        with request_lock:
+            with self._lock:
+                result = self._by_request.get(request_id)
+            if result is None:
+                result = self.client.call(url, body)
+                with self._lock:
+                    self._by_request[request_id] = result
+        with self._lock:
+            self._results[key] = result
+        return result
 
     def _stages(self) -> list[str]:
         return ["input"] + (["output"] if self.cfg.output_url else [])
