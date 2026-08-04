@@ -16,3 +16,10 @@ data/all.jsonl
 
 # http-api response cache
 .cache/
+
+# local credentials
+.env
+
+# editable install metadata
+*.egg-info/
+src/*.egg-info/

@@ -1,0 +1,28 @@
+{
+  "name": "guard-via-chat-completions",
+  "input_url": "https://your-infra.example.com/v1/chat/completions",
+  "output_url": "https://your-infra.example.com/v1/chat/completions",
+  "headers": {"Authorization": "Bearer ${GUARDRAIL_API_KEY}"},
+
+  "input_body": {
+    "model": "your-guard-model",
+    "temperature": 0,
+    "response_format": {"type": "json_object"},
+    "messages": "{turns}"
+  },
+  "output_body": {
+    "model": "your-guard-model",
+    "temperature": 0,
+    "response_format": {"type": "json_object"},
+    "messages": "{turns_with_response}"
+  },
+
+  "unwrap_json_at": "choices.0.message.content",
+  "score_path": "risk_score",
+  "blocked_path": "blocked",
+
+  "timeout_s": 30,
+  "retries": 2,
+  "concurrency": 8,
+  "cache_dir": ".cache/guard-chat"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "guard-answering-in-prose",
+  "input_url": "https://your-infra.example.com/v1/chat/completions",
+  "headers": {"Authorization": "Bearer ${GUARDRAIL_API_KEY}"},
+
+  "input_body": {
+    "model": "your-guard-model",
+    "temperature": 0,
+    "messages": "{turns}"
+  },
+
+  "blocked_path": "choices.0.message.content",
+  "blocked_pattern": "(?i)\\b(unsafe|block(ed)?|violat)",
+
+  "timeout_s": 30,
+  "concurrency": 8
+}

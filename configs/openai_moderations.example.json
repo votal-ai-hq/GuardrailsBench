@@ -1,0 +1,15 @@
+{
+  "name": "guard-via-moderations",
+  "input_url": "https://your-infra.example.com/v1/moderations",
+  "output_url": "https://your-infra.example.com/v1/moderations",
+  "headers": {"Authorization": "Bearer ${GUARDRAIL_API_KEY}"},
+
+  "input_body":  {"model": "your-moderation-model", "input": "{input_text}"},
+  "output_body": {"model": "your-moderation-model", "input": "{response}"},
+
+  "blocked_path": "results.0.flagged",
+  "score_path": "results.0.category_scores.violence",
+
+  "timeout_s": 20,
+  "concurrency": 8
+}

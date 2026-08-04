@@ -251,7 +251,11 @@ def test_the_cache_never_contains_credentials(server, tmp_path, monkeypatch):
 def test_prepare_issues_calls_concurrently(server):
     server.behaviour = "slow"          # 0.5s each; 12 calls serially is 6s
     guard = HttpGuardrail(_cfg(server, concurrency=8, timeout_s=10))
-    items = [_item(f"i{i}") for i in range(6)]
+    # Distinct text per item: identical requests are deduplicated to a single
+    # call by design, which would leave nothing here to run in parallel.
+    items = [_item(f"i{i}", f"Should I buy stock number {i} right now?",
+                   f"I would put all of it into number {i} today, without question.")
+             for i in range(6)]
     t0 = time.perf_counter()
     guard.prepare(items)
     elapsed = time.perf_counter() - t0
@@ -274,3 +278,190 @@ def test_it_plugs_into_the_standard_harness(server):
     assert result["coverage"] == 1.0
     assert result["tiers"][TIER_CORE]["tpr"] == 1.0
     assert result["latency"]["p95_ms"] > 0
+
+
+def test_identical_items_issue_one_call_and_do_not_race_the_cache(server, tmp_path):
+    """Regression: N items with the same text render to the same request, so
+    prepare() had N threads write the same cache file at once. The torn result
+    was invalid JSON that only failed under load — CI caught it, local runs did
+    not. Fixed by an atomic rename plus one in-flight call per distinct request.
+    """
+    cache = tmp_path / "cache"
+    guard = HttpGuardrail(_cfg(server, cache_dir=str(cache), concurrency=8))
+    # Same text, different ids — exactly the shape of a templated tier.
+    items = [_item(f"same{i}", "overdraft fees", "fine", "allowed") for i in range(24)]
+
+    guard.prepare(items)
+    assert len(server.seen) == 2, \
+        f"24 identical items should be 1 input + 1 output call, got {len(server.seen)}"
+
+    written = list(cache.glob("*.json"))
+    assert len(written) == 2
+    for f in written:
+        json.loads(f.read_text())          # torn writes raise JSONDecodeError here
+    assert not list(cache.glob("*.tmp")), "temp files must be renamed away"
+
+    traces = run(guard, items)
+    assert all(t.evaluable for t in traces.values())
+
+
+def test_a_second_process_reads_the_cache_written_by_the_first(server, tmp_path):
+    """The atomic write has to be readable, not just well-formed in memory."""
+    cfg = _cfg(server, cache_dir=str(tmp_path / "cache"), concurrency=8)
+    first = HttpGuardrail(cfg)
+    items = [_item(f"same{i}", "overdraft fees", "fine", "allowed") for i in range(12)]
+    first.prepare(items)
+    calls = len(server.seen)
+
+    second = HttpGuardrail(cfg)
+    second.prepare(items)
+    assert len(server.seen) == calls, "everything should have come from the cache"
+    assert second.client.cache_hits == 2
+
+
+# ---- OpenAI-shaped endpoints ------------------------------------------------
+class _OpenAIHandler(BaseHTTPRequestHandler):
+    """Speaks the two OpenAI shapes a guardrail is usually deployed behind."""
+
+    def log_message(self, *a):
+        pass
+
+    def do_POST(self):
+        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        self.server.seen.append((self.path, body, dict(self.headers)))
+        blob = json.dumps(body).lower()
+        risky = "buy" in blob or "put it all" in blob
+
+        if self.path.endswith("/moderations"):
+            payload = {"id": "modr-1", "results": [
+                {"flagged": risky, "category_scores": {"financial_advice": 0.9 if risky else 0.1}}]}
+        elif self.server.style == "prose":
+            verdict = "UNSAFE — this violates the advice policy." if risky else "Safe."
+            payload = {"choices": [{"message": {"role": "assistant", "content": verdict}}]}
+        else:  # a guard told to answer in JSON: the payload is a *string*
+            verdict = json.dumps({"blocked": risky, "risk_score": 0.9 if risky else 0.1})
+            payload = {"id": "chatcmpl-1", "choices": [
+                {"index": 0, "message": {"role": "assistant", "content": verdict},
+                 "finish_reason": "stop"}]}
+
+        raw = json.dumps(payload).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
+
+@pytest.fixture
+def openai_server():
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), _OpenAIHandler)
+    srv.seen, srv.style = [], "json"
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield srv
+    srv.shutdown()
+    srv.server_close()
+
+
+def _url(server, path):
+    host, port = server.server_address
+    return f"http://{host}:{port}{path}"
+
+
+def test_openai_chat_completions_with_a_json_verdict(openai_server):
+    """The verdict arrives as a JSON *string* inside choices[0].message.content,
+    so it has to be unwrapped before score_path/blocked_path can address it."""
+    guard = HttpGuardrail(HttpConfig(
+        name="chat-guard",
+        input_url=_url(openai_server, "/v1/chat/completions"),
+        output_url=_url(openai_server, "/v1/chat/completions"),
+        input_body={"model": "guard-1", "temperature": 0, "messages": "{turns}"},
+        output_body={"model": "guard-1", "messages": "{turns_with_response}"},
+        unwrap_json_at="choices.0.message.content",
+        score_path="risk_score", blocked_path="blocked",
+        retries=0, timeout_s=5,
+    ))
+    allowed = [_item(f"a{i}", "What are the overdraft fees?", "Check the schedule.",
+                     "allowed") for i in range(20)]
+    guard.calibrate(allowed)
+    traces = run(guard, [_item()])
+    assert traces["a"].evaluable and traces["a"].blocked
+    assert traces["a"].input_decision.score == pytest.approx(0.9)
+
+    # The request really was OpenAI-shaped: a messages list, not a blob.
+    # seen[0] is a calibration call, so find the one carrying the scored item.
+    sent = next(b for _, b, _ in openai_server.seen
+                if b.get("messages") == [{"role": "user", "content": _item().prompt}])
+    assert sent["model"] == "guard-1"
+    assert sent["temperature"] == 0
+
+
+def test_turns_with_response_appends_the_completion(openai_server):
+    """Output-stage screening of a chat-shaped guard needs the assistant turn."""
+    guard = HttpGuardrail(HttpConfig(
+        name="chat-guard",
+        input_url=_url(openai_server, "/v1/chat/completions"),
+        output_url=_url(openai_server, "/v1/chat/completions"),
+        input_body={"messages": "{turns}"},
+        output_body={"messages": "{turns_with_response}"},
+        unwrap_json_at="choices.0.message.content", blocked_path="blocked",
+        retries=0, timeout_s=5,
+    ))
+    item = _item("x", "What are the overdraft fees?", "Check the fee schedule.", "allowed")
+    run(guard, [item])
+    output_call = [b for _, b, _ in openai_server.seen if len(b["messages"]) == 2]
+    assert output_call, "the output stage never sent the completion"
+    assert output_call[0]["messages"][-1] == {"role": "assistant",
+                                             "content": "Check the fee schedule."}
+
+
+def test_openai_moderations_shape_needs_no_unwrapping(openai_server):
+    """This one is plain nested JSON, so dotted paths reach it directly."""
+    guard = HttpGuardrail(HttpConfig(
+        name="moderation-guard",
+        input_url=_url(openai_server, "/v1/moderations"),
+        input_body={"model": "mod-1", "input": "{input_text}"},
+        blocked_path="results.0.flagged",
+        score_path="results.0.category_scores.financial_advice",
+        retries=0, timeout_s=5,
+    ))
+    allowed = [_item(f"a{i}", "What are the overdraft fees?", "Check the schedule.",
+                     "allowed") for i in range(20)]
+    guard.calibrate(allowed)
+    assert run(guard, [_item()])["a"].blocked
+
+
+def test_a_guard_that_answers_in_prose(openai_server):
+    """No JSON at all — match the text. Labelled @fixed: no score to calibrate."""
+    openai_server.style = "prose"
+    guard = HttpGuardrail(HttpConfig(
+        name="prose-guard",
+        input_url=_url(openai_server, "/v1/chat/completions"),
+        input_body={"messages": "{turns}"},
+        blocked_path="choices.0.message.content",
+        blocked_pattern=r"(?i)\b(unsafe|block(ed)?|violat)",
+        retries=0, timeout_s=5,
+    ))
+    assert guard.label == "prose-guard @fixed"
+    assert run(guard, [_item()])["a"].blocked
+    safe = _item("s", "What are the overdraft fees?", "Check the schedule.", "allowed")
+    assert not run(guard, [safe])["s"].blocked
+
+
+def test_a_wrong_unwrap_path_is_a_diagnosable_gap(openai_server):
+    guard = HttpGuardrail(HttpConfig(
+        name="misconfigured",
+        input_url=_url(openai_server, "/v1/chat/completions"),
+        input_body={"messages": "{turns}"},
+        unwrap_json_at="choices.0.message.role",   # a plain string, not JSON
+        blocked_path="blocked", retries=0, timeout_s=5,
+    ))
+    assert not run(guard, [_item()])["a"].evaluable
+    assert "did not match config" in guard.error_summary()
+
+
+def test_blocked_pattern_requires_something_to_match_against(tmp_path):
+    path = tmp_path / "c.json"
+    path.write_text(json.dumps({"input_url": "http://x", "score_path": "s",
+                                "blocked_pattern": "unsafe"}))
+    with pytest.raises(ValueError, match="needs blocked_path"):
+        HttpConfig.load(path)

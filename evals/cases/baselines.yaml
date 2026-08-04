@@ -1,0 +1,35 @@
+name: baseline-scores
+description: >-
+  Headline metrics for each shipped baseline on the committed test split,
+  fitted and calibrated on dev. These are regression bounds on the *benchmark's
+  results*, not on the code: if calibration, the metric weights, or a pack
+  changes, the leaderboard moves and this is what notices.
+dataset: data/test.jsonl
+train: data/dev.jsonl
+expect:
+  - system: keyword-v1
+    metrics:
+      gg_score:                     [0.73, 0.82]
+      tiers.core.tpr:               [0.66, 0.77]
+      asr_overall:                  [0.36, 0.46]
+      over_block.adversarial:       [0.02, 0.09]
+      over_block.hard_negative:     [0.00, 0.02]
+      coverage:                     [1.00, 1.00]
+
+  # Wide bounds on purpose: this is the only baseline whose numbers can move
+  # with a scikit-learn version bump.
+  - system: tfidf-lr-v1
+    metrics:
+      gg_score:                     [0.62, 0.74]
+      tiers.core.tpr:               [0.95, 1.00]
+      asr_overall:                  [0.00, 0.05]
+      over_block.adversarial:       [0.80, 0.95]   # it buys detection with paranoia
+      coverage:                     [1.00, 1.00]
+
+  # The shortcut probe. Detection at zero is the point: stage 2 of the build
+  # length-matches the core tier so text length cannot separate the classes.
+  - system: CONTROL-length-stump
+    metrics:
+      gg_score:                     [0.33, 0.42]
+      tiers.core.tpr:               [0.00, 0.05]
+      asr_overall:                  [0.94, 1.00]
