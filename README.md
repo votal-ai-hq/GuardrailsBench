@@ -27,7 +27,9 @@ python -m guardrailgym validate --data data/test.jsonl        # dataset gates
 python -m guardrailgym eval --system keyword-v1 --train data/dev.jsonl
 python -m guardrailgym leaderboard --train data/dev.jsonl \
     --incumbent-csv data/seed/custom_policy_5k_llmshield.csv
-pytest
+
+pytest                      # the code
+python evals/run_evals.py   # the results
 ```
 
 Current results are in [LEADERBOARD.md](LEADERBOARD.md); the scoring model is in
@@ -204,12 +206,21 @@ screened, which is a finding, not a gap: `output_only` becomes uncatchable.
 ## Running the tests
 
 ```bash
-pytest                       # 182 tests, ~30s, no network
+pytest                       # 182 unit tests, ~30s, no network
+python evals/run_evals.py    # 33 golden checks on the benchmark's own results
 ruff check .                 # lint
 python -m guardrailgym validate --data data/test.jsonl
 ```
 
-CI (`.github/workflows/ci.yml`) runs those three on every push and PR against
+Two suites, because they catch different failures. **`tests/`** asserts the code
+is correct — fast, offline, per-function. **`evals/`** asserts the *results* have
+not drifted: that a change to calibration, the metric weights, or a policy pack
+has not silently moved the leaderboard. Cases are YAML declaring metric ranges,
+per-family ASR bounds, and outranking invariants (`keyword-v1` must beat
+`CONTROL-block-all`, and so on). Ranges rather than exact values, so a
+scikit-learn bump does not fail the build but a real drift does.
+
+CI (`.github/workflows/ci.yml`) runs all four on every push and PR against
 Python 3.11. Nothing reaches the network: the HTTP adapter tests start a real
 `ThreadingHTTPServer` on localhost, so timeouts, retries, concurrency and
 recorded latency are exercised for real rather than mocked.
@@ -246,7 +257,7 @@ class MyGuard(ScoreGuardrail):
         return my_model(item.response)
 ```
 
-Register it in `guardrailgym/systems/__init__.py` and it is available to `eval`
+Register it in `src/guardrailgym/systems/__init__.py` and it is available to `eval`
 and `leaderboard`. Calibration and cross-validation come for free; override
 `fit` if it trains. If your system can't rule on some items, return
 `Decision(False, None, REASON_NOT_EVALUABLE)` rather than allowing them.
@@ -271,25 +282,26 @@ other way (92 vs 213 characters).
 ## Layout
 
 ```
-AGENTS.md       constraints to read before changing anything
-.env.example    the one credential the repo can consume
+AGENTS.md         constraints to read before changing anything
+.env.example      the one credential the repo can consume
 src/guardrailgym/
-  schema.py     Item / Decision / Trace
-  build.py      the five build stages
-  attacks.py    attack families and their benign mirrors
-  metrics.py    GG-Score, ASR, over-block, coverage, stage attribution
-  validate.py   the dataset gates
-  runner.py     execution, latency, cluster-disjoint cross-validation
-  report.py     leaderboard rendering
-  systems/      baselines
-data/seed/      the seed corpus the dataset is built from
-  systems/http_api.py  benchmark a guardrail behind an HTTP endpoint
-  pack.py       policy packs: the domain boundary
-  packs/        finance.yaml, healthcare.yaml
-configs/        example http-api config
-tests/          182 unit tests; test_metrics.py pins the two scoring regressions
-                test_reproducibility.py pins data/ to the seed corpus
-                test_pack.py builds a whole dataset from a second domain
-evals/          golden cases + run_evals.py: the results, not the code
-docs/METRICS.md the scoring model
+  schema.py       Item / Decision / Trace
+  build.py        the five build stages
+  attacks.py      attack shapes; the words live in packs/
+  metrics.py      GG-Score, ASR, over-block, coverage, stage attribution
+  validate.py     the dataset gates
+  runner.py       execution, latency, cluster-disjoint cross-validation
+  report.py       leaderboard rendering
+  pack.py         policy packs: the domain boundary
+  packs/          finance.yaml, healthcare.yaml
+  systems/        baselines + http_api.py for a guardrail behind an endpoint
+configs/          example http-api config
+data/             dev.jsonl, test.jsonl, and seed/ — the corpus they build from
+tests/            182 unit tests: the code
+                  test_metrics.py pins the two scoring regressions
+                  test_reproducibility.py pins data/ to the seed corpus
+                  test_pack.py builds a whole dataset from a second domain
+evals/            33 golden checks: the results
+                  cases/*.yaml + run_evals.py
+docs/METRICS.md   the scoring model
 ```
