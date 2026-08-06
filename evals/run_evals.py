@@ -31,11 +31,11 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from guardrailgym.metrics import score  # noqa: E402
-from guardrailgym.runner import evaluate  # noqa: E402
-from guardrailgym.schema import load_items  # noqa: E402
-from guardrailgym.systems import get  # noqa: E402
-from guardrailgym.systems.http_api import dig  # noqa: E402
+from guardrailsbench.metrics import score  # noqa: E402
+from guardrailsbench.runner import evaluate  # noqa: E402
+from guardrailsbench.schema import load_items  # noqa: E402
+from guardrailsbench.systems import get  # noqa: E402
+from guardrailsbench.systems.http_api import dig  # noqa: E402
 
 CASES = Path(__file__).parent / "cases"
 

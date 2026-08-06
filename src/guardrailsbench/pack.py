@@ -1,4 +1,4 @@
-"""Policy packs: everything about GuardrailGym that is domain-specific.
+"""Policy packs: everything about GuardrailsBench that is domain-specific.
 
 The engine is domain-agnostic and always was — ``schema``, ``metrics``,
 ``runner``, ``report`` and the HTTP adapter contain no finance vocabulary at

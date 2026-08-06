@@ -1,7 +1,7 @@
 """Scoring surface beyond the two regressions in test_metrics.py."""
 import pytest
 
-from guardrailgym.metrics import (
+from guardrailsbench.metrics import (
     DEFAULT_WEIGHTS,
     efficiency_score,
     hard_negative_cost,
@@ -9,7 +9,7 @@ from guardrailgym.metrics import (
     robustness_delta,
     score,
 )
-from guardrailgym.schema import (
+from guardrailsbench.schema import (
     REASON_NOT_EVALUABLE,
     TIER_ADVERSARIAL,
     TIER_CORE,

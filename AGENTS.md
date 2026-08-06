@@ -11,7 +11,7 @@ them. There is no model client in the repo and nothing holds state across runs â
 if you are adding one, that is a new component, not a change to an existing one.
 
 ```
-src/guardrailgym/
+src/guardrailsbench/
   schema.py     Item / Decision / Trace â€” the only vocabulary the engine has
   build.py      five stages: ingest -> cluster -> length-match -> hard negs -> attacks -> split
   attacks.py    attack SHAPES (the words live in packs/)
@@ -64,10 +64,10 @@ pip install -e ".[dev]"                             # src layout: install first
 pytest                                              # 182 unit tests, ~30s, no network
 python evals/run_evals.py                           # golden results, ~40s
 ruff check .
-python -m guardrailgym validate --data data/test.jsonl
-python -m guardrailgym packs                        # bundled policy packs
-python -m guardrailgym build --seed-csv data/seed/custom_policy_5k_llmshield.csv --out data/
-python -m guardrailgym leaderboard --train data/dev.jsonl \
+python -m guardrailsbench validate --data data/test.jsonl
+python -m guardrailsbench packs                        # bundled policy packs
+python -m guardrailsbench build --seed-csv data/seed/custom_policy_5k_llmshield.csv --out data/
+python -m guardrailsbench leaderboard --train data/dev.jsonl \
     --incumbent-csv data/seed/custom_policy_5k_llmshield.csv
 ```
 

@@ -1,6 +1,6 @@
 """Policy packs: the domain boundary.
 
-The claim these tests defend is that porting GuardrailGym to a new policy domain
+The claim these tests defend is that porting GuardrailsBench to a new policy domain
 is a YAML file and nothing else. So they build a complete dataset from a second
 pack whose seed CSV shares no column names, no label values and no categories
 with the finance one, and check it comes out valid.
@@ -11,20 +11,20 @@ from pathlib import Path
 
 import pytest
 
-import guardrailgym
-from guardrailgym.attacks import FAMILIES, benign_families, families
-from guardrailgym.build import build, ingest, make_adversarial, make_hard_negatives
-from guardrailgym.pack import DEFAULT_PACK, PolicyPack, bundled_packs, load_pack
-from guardrailgym.schema import (
+import guardrailsbench
+from guardrailsbench.attacks import FAMILIES, benign_families, families
+from guardrailsbench.build import build, ingest, make_adversarial, make_hard_negatives
+from guardrailsbench.pack import DEFAULT_PACK, PolicyPack, bundled_packs, load_pack
+from guardrailsbench.schema import (
     LABEL_ALLOWED,
     LABEL_VIOLATING,
     TIER_ADVERSARIAL,
     load_items,
 )
-from guardrailgym.validate import effective_n, validate_dataset, validate_splits
+from guardrailsbench.validate import effective_n, validate_dataset, validate_splits
 
 HEALTHCARE_SEED = "tests/fixtures/healthcare_seed.csv"
-PACKAGE = Path(guardrailgym.__file__).parent
+PACKAGE = Path(guardrailsbench.__file__).parent
 
 
 def test_both_packs_are_bundled_and_load():
@@ -95,7 +95,7 @@ def test_families_are_bound_to_the_pack_they_are_asked_for():
 
 def test_the_same_item_renders_differently_under_two_packs():
     """The attack shape is shared; the words are not."""
-    from guardrailgym.schema import TIER_CORE, Item
+    from guardrailsbench.schema import TIER_CORE, Item
     item = Item(item_id="x", turns=[{"role": "user", "content": "Should I stop this?"}],
                 response="A long enough response to survive the output_only filter.",
                 label=LABEL_VIOLATING, tier=TIER_CORE, cluster_id=1)
@@ -185,8 +185,8 @@ def test_effective_n_works_on_a_second_domain(tmp_path):
 
 # ---- the lexicon baseline follows the pack ----------------------------------
 def test_the_keyword_baseline_uses_the_pack_it_is_given():
-    from guardrailgym.schema import TIER_CORE, Item
-    from guardrailgym.systems.keyword import KeywordGuardrail
+    from guardrailsbench.schema import TIER_CORE, Item
+    from guardrailsbench.systems.keyword import KeywordGuardrail
 
     def _item(text, response="ok"):
         return Item(item_id="i", turns=[{"role": "user", "content": text}],
@@ -203,8 +203,8 @@ def test_the_keyword_baseline_uses_the_pack_it_is_given():
 
 
 def test_keyword_negations_still_subtract_under_a_new_pack():
-    from guardrailgym.schema import TIER_CORE, Item
-    from guardrailgym.systems.keyword import KeywordGuardrail
+    from guardrailsbench.schema import TIER_CORE, Item
+    from guardrailsbench.systems.keyword import KeywordGuardrail
 
     hc = KeywordGuardrail("healthcare")
     bare = Item(item_id="a", turns=[{"role": "user", "content":

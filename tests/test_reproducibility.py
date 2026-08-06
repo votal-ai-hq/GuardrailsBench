@@ -9,9 +9,9 @@ import json
 
 from conftest import ROOT
 
-from guardrailgym.build import build
-from guardrailgym.schema import load_items
-from guardrailgym.validate import validate_splits
+from guardrailsbench.build import build
+from guardrailsbench.schema import load_items
+from guardrailsbench.validate import validate_splits
 
 
 def test_build_reproduces_the_committed_dataset(seed_corpus, tmp_path):

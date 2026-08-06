@@ -3,19 +3,19 @@ import random
 
 import pytest
 
-from guardrailgym.metrics import score
-from guardrailgym.runner import cluster_folds, evaluate, run
-from guardrailgym.schema import (
+from guardrailsbench.metrics import score
+from guardrailsbench.runner import cluster_folds, evaluate, run
+from guardrailsbench.schema import (
     LABEL_ALLOWED,
     LABEL_VIOLATING,
     REASON_NOT_EVALUABLE,
     TIER_CORE,
     Item,
 )
-from guardrailgym.systems import REGISTRY, AllowAll, BlockAll, IncumbentReplay, get
-from guardrailgym.systems.base import ScoreGuardrail
-from guardrailgym.systems.control import LengthStump
-from guardrailgym.systems.keyword import KeywordGuardrail
+from guardrailsbench.systems import REGISTRY, AllowAll, BlockAll, IncumbentReplay, get
+from guardrailsbench.systems.base import ScoreGuardrail
+from guardrailsbench.systems.control import LengthStump
+from guardrailsbench.systems.keyword import KeywordGuardrail
 
 
 def _item(iid, text, response, label, tier=TIER_CORE, cluster=None):
@@ -108,7 +108,7 @@ def test_score_guardrails_expose_their_operating_point():
 
 
 def test_tfidf_needs_both_classes():
-    from guardrailgym.systems.tfidf_lr import TfidfLRGuardrail
+    from guardrailsbench.systems.tfidf_lr import TfidfLRGuardrail
     only_violating = [i for i in _toy_corpus() if i.label == LABEL_VIOLATING]
     with pytest.raises(ValueError, match="both classes"):
         TfidfLRGuardrail().fit(only_violating)
@@ -147,7 +147,7 @@ def test_stateless_systems_skip_cross_validation():
 
 # ---- incumbent replay -------------------------------------------------------
 def test_incumbent_replay_covers_core_and_abstains_elsewhere(seed_csv):
-    from guardrailgym.build import ingest, make_adversarial
+    from guardrailsbench.build import ingest, make_adversarial
     core = ingest(seed_csv)[:20]
     adv = make_adversarial(core, 2, random.Random(0))
     system = IncumbentReplay(seed_csv)
@@ -166,7 +166,7 @@ def test_incumbent_replay_covers_core_and_abstains_elsewhere(seed_csv):
 
 
 def test_incumbent_replay_uses_recorded_latency(seed_csv):
-    from guardrailgym.build import ingest
+    from guardrailsbench.build import ingest
     core = ingest(seed_csv)[:10]
     traces = run(IncumbentReplay(seed_csv), core)
     assert all(t.latency_ms > 100 for t in traces.values()), \
@@ -204,7 +204,7 @@ def test_evaluation_is_deterministic(dataset):
 def test_evaluate_accepts_a_prebuilt_instance(seed_csv):
     """incumbent-replay is constructed around a verdict file, so it reaches the
     harness already built rather than as a factory."""
-    from guardrailgym.build import ingest
+    from guardrailsbench.build import ingest
     core = ingest(seed_csv)[:10]
     system = IncumbentReplay(seed_csv)
     traces, returned = evaluate(system, core)

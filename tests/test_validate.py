@@ -1,7 +1,7 @@
 """The dataset gates. Each one is checked against the failure it was written for."""
 import pytest
 
-from guardrailgym.schema import (
+from guardrailsbench.schema import (
     LABEL_ALLOWED,
     LABEL_VIOLATING,
     TIER_ADVERSARIAL,
@@ -9,7 +9,7 @@ from guardrailgym.schema import (
     TIER_HARD_NEGATIVE,
     Item,
 )
-from guardrailgym.validate import (
+from guardrailsbench.validate import (
     MIN_FAMILY_SIZE,
     auc,
     shortcut_auc,
@@ -157,7 +157,7 @@ def test_shortcut_auc_is_direction_free():
 def test_effective_n_separates_items_from_distinct_renderings():
     """A templated tier reports a rate over its item count, but the precision of
     that rate is set by distinct renderings and by clusters."""
-    from guardrailgym.validate import effective_n
+    from guardrailsbench.validate import effective_n
     items = [_it(f"h{i}", "the one and only template rendering", LABEL_ALLOWED,
                  TIER_HARD_NEGATIVE, cluster=7) for i in range(50)]
     eff = effective_n(items + _healthy())
@@ -169,7 +169,7 @@ def test_the_shipped_hard_negative_tier_is_thinner_than_its_item_count(dataset):
     """Documents a known limitation of the committed dataset: four of the eight
     hard-negative templates carry no variable slots, so 200 items collapse to a
     handful of strings in four clusters."""
-    from guardrailgym.validate import effective_n
+    from guardrailsbench.validate import effective_n
     hn = effective_n(dataset)[TIER_HARD_NEGATIVE]
     assert hn["items"] == 200
     assert hn["distinct"] < 40, "if this grows, the templates were fixed"

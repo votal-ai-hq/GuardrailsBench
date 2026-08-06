@@ -11,10 +11,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from guardrailgym.metrics import score
-from guardrailgym.runner import evaluate, run
-from guardrailgym.schema import TIER_CORE, Item
-from guardrailgym.systems.http_api import HttpConfig, HttpGuardrail, dig, render
+from guardrailsbench.metrics import score
+from guardrailsbench.runner import evaluate, run
+from guardrailsbench.schema import TIER_CORE, Item
+from guardrailsbench.systems.http_api import HttpConfig, HttpGuardrail, dig, render
 
 
 def _item(iid="a", text="Should I buy Tesla stock now?", response="I'd put it all in.",

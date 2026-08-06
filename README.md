@@ -1,4 +1,4 @@
-# GuardrailGym
+# GuardrailsBench
 
 A benchmark for LLM guardrails in a financial-assistant setting, built so that
 the obvious ways of winning it don't work.
@@ -12,7 +12,7 @@ nothing because they skip one of them:
    matcher, because it pays for the mirrors and the hard negatives.
 2. **The shortcut has to be dead.** In the seed corpus a decision stump on
    response length alone reached 0.846 AUC. The core tier is length-matched on a
-   joint (prompt, response) grid, and `guardrailgym validate` fails the dataset
+   joint (prompt, response) grid, and `guardrailsbench validate` fails the dataset
    if that ever regresses.
 3. **Abstaining is not passing.** A system that can't rule on an item says
    `NOT_EVALUABLE`; those items are excluded from every rate, counted as a
@@ -23,9 +23,9 @@ nothing because they skip one of them:
 ```bash
 pip install -e ".[dev]"        # src layout: install once, then the CLI works
 
-python -m guardrailgym validate --data data/test.jsonl        # dataset gates
-python -m guardrailgym eval --system keyword-v1 --train data/dev.jsonl
-python -m guardrailgym leaderboard --train data/dev.jsonl \
+python -m guardrailsbench validate --data data/test.jsonl        # dataset gates
+python -m guardrailsbench eval --system keyword-v1 --train data/dev.jsonl
+python -m guardrailsbench leaderboard --train data/dev.jsonl \
     --incumbent-csv data/seed/custom_policy_5k_llmshield.csv
 
 pytest                      # the code
@@ -106,7 +106,7 @@ gives dev 4 templates and test the other 4.
 
 Two consequences: `hard-neg over-block` is a rate over 4 template groups, not
 200 items; and no held-out system can generalise there, which is most of why
-`tfidf-lr-v1` over-blocks 100% of them. `guardrailgym validate` prints
+`tfidf-lr-v1` over-blocks 100% of them. `guardrailsbench validate` prints
 items/distinct/clusters per tier, and the leaderboard footer carries the caveat.
 Fixing it means authoring more templates with real variation, which changes
 `data/test.jsonl` and invalidates any prior leaderboard.
@@ -120,10 +120,10 @@ holding the seed-column mapping, the categories, the hard-negative templates,
 the text each attack family wraps a request in, and the keyword lexicon.
 
 ```bash
-python -m guardrailgym packs                      # what is bundled
-python -m guardrailgym packs --pack healthcare    # what is in one
-python -m guardrailgym build --pack healthcare --seed-csv my_corpus.csv --out data/
-python -m guardrailgym eval --system keyword-v1 --pack healthcare --data data/test.jsonl
+python -m guardrailsbench packs                      # what is bundled
+python -m guardrailsbench packs --pack healthcare    # what is in one
+python -m guardrailsbench build --pack healthcare --seed-csv my_corpus.csv --out data/
+python -m guardrailsbench eval --system keyword-v1 --pack healthcare --data data/test.jsonl
 ```
 
 Two packs ship. `finance` is the original content, extracted unchanged —
@@ -157,7 +157,7 @@ Point it at the endpoint with a JSON config — no code:
 ```bash
 export GUARDRAIL_API_KEY=...
 cp configs/http_api.example.json configs/mine.json   # edit urls + json paths
-python -m guardrailgym eval --system http-api --api-config configs/mine.json \
+python -m guardrailsbench eval --system http-api --api-config configs/mine.json \
     --data data/test.jsonl --train data/dev.jsonl
 ```
 
@@ -236,7 +236,7 @@ screened, which is a finding, not a gap: `output_only` becomes uncatchable.
 pytest                       # 182 unit tests, ~30s, no network
 python evals/run_evals.py    # 33 golden checks on the benchmark's own results
 ruff check .                 # lint
-python -m guardrailgym validate --data data/test.jsonl
+python -m guardrailsbench validate --data data/test.jsonl
 ```
 
 Two suites, because they catch different failures. **`tests/`** asserts the code
@@ -272,7 +272,7 @@ still runs on a checkout without the corpus.
 ## Adding a system
 
 ```python
-from guardrailgym.systems.base import ScoreGuardrail
+from guardrailsbench.systems.base import ScoreGuardrail
 
 class MyGuard(ScoreGuardrail):
     name = "my-guard-v1"
@@ -284,7 +284,7 @@ class MyGuard(ScoreGuardrail):
         return my_model(item.response)
 ```
 
-Register it in `src/guardrailgym/systems/__init__.py` and it is available to `eval`
+Register it in `src/guardrailsbench/systems/__init__.py` and it is available to `eval`
 and `leaderboard`. Calibration and cross-validation come for free; override
 `fit` if it trains. If your system can't rule on some items, return
 `Decision(False, None, REASON_NOT_EVALUABLE)` rather than allowing them.
@@ -292,7 +292,7 @@ and `leaderboard`. Calibration and cross-validation come for free; override
 ## Rebuilding the dataset
 
 ```bash
-python -m guardrailgym build \
+python -m guardrailsbench build \
     --seed-csv data/seed/custom_policy_5k_llmshield.csv --out data/
 ```
 
@@ -311,7 +311,7 @@ other way (92 vs 213 characters).
 ```
 AGENTS.md         constraints to read before changing anything
 .env.example      the one credential the repo can consume
-src/guardrailgym/
+src/guardrailsbench/
   schema.py       Item / Decision / Trace
   build.py        the five build stages
   attacks.py      attack shapes; the words live in packs/

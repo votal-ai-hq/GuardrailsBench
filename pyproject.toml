@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "guardrailgym"
+name = "guardrailsbench"
 version = "0.1.0"
 description = "A benchmark for LLM guardrails that is hard to game"
 readme = "README.md"
@@ -20,14 +20,14 @@ dependencies = [
 dev = ["pytest>=7.4", "ruff>=0.5"]
 
 [project.scripts]
-guardrailgym = "guardrailgym.cli:main"
+guardrailsbench = "guardrailsbench.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["guardrailgym*"]
+include = ["guardrailsbench*"]
 
 [tool.setuptools.package-data]
-guardrailgym = ["packs/*.yaml"]
+guardrailsbench = ["packs/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

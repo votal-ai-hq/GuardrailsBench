@@ -1,4 +1,4 @@
-"""Command line entry point: ``python -m guardrailgym <command>``.
+"""Command line entry point: ``python -m guardrailsbench <command>``.
 
     build        seed CSV -> dev/test jsonl (see build.py for the stages)
     validate     structural + leakage checks on a built dataset
@@ -150,7 +150,7 @@ def cmd_leaderboard(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="guardrailgym")
+    p = argparse.ArgumentParser(prog="guardrailsbench")
     sub = p.add_subparsers(dest="command", required=True)
 
     b = sub.add_parser("build", help="build the dataset from the seed CSV")

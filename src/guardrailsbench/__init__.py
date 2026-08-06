@@ -1,4 +1,4 @@
-"""GuardrailGym: a benchmark for LLM guardrails that is hard to game.
+"""GuardrailsBench: a benchmark for LLM guardrails that is hard to game.
 
 The dataset is built in five stages (``build.py``), attacked with
 intent-preserving transforms (``attacks.py``), scored on four axes at a fixed

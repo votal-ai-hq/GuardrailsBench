@@ -1,5 +1,5 @@
 # A second domain, written to prove the abstraction holds. If porting
-# GuardrailGym to a new policy area needed anything outside this file, the pack
+# GuardrailsBench to a new policy area needed anything outside this file, the pack
 # boundary would be in the wrong place.
 #
 # Note how little it has in common with finance: different seed columns,

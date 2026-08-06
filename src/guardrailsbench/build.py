@@ -1,4 +1,4 @@
-"""GuardrailGym dataset build pipeline.
+"""GuardrailsBench dataset build pipeline.
 
 Stages
   0 ingest        seed CSV -> canonical Items, drop leaky metadata

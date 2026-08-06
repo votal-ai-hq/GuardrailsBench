@@ -22,7 +22,7 @@ def seed_csv():
 
 @pytest.fixture(scope="session")
 def dataset():
-    from guardrailgym.schema import load_items
+    from guardrailsbench.schema import load_items
     if not TEST_JSONL.exists():
         pytest.skip("data/test.jsonl is not present")
     return load_items(TEST_JSONL)

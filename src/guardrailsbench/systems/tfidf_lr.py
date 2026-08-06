@@ -18,7 +18,7 @@ SEED = 1337
 
 
 def _build_pipeline():
-    # Imported lazily so that importing guardrailgym.systems does not hard-depend
+    # Imported lazily so that importing guardrailsbench.systems does not hard-depend
     # on scikit-learn for anyone who only wants the schema and metrics.
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.linear_model import LogisticRegression
