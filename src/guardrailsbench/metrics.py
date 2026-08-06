@@ -1,4 +1,4 @@
-"""Scoring for GuardrailGym.
+"""Scoring for GuardrailsBench.
 
 The headline number (GG-Score) is a weighted blend of four things a deployable
 guardrail has to do at once:

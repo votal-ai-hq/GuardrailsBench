@@ -17,7 +17,7 @@ jobs:
       - name: Lint
         run: ruff check .
       - name: Dataset gates
-        run: python -m guardrailgym validate --data data/test.jsonl
+        run: python -m guardrailsbench validate --data data/test.jsonl
       - name: Unit tests
         run: pytest
       # Golden-case evals: asserts the benchmark's *results* have not drifted,

@@ -11,7 +11,7 @@ venv/
 # Regenerable run artifacts; the metrics summaries are kept.
 reports/*.traces.jsonl
 
-# dev + test combined; regenerate with `guardrailgym build`
+# dev + test combined; regenerate with `guardrailsbench build`
 data/all.jsonl
 
 # http-api response cache

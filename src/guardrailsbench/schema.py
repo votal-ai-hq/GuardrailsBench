@@ -1,4 +1,4 @@
-"""Canonical data types for GuardrailGym.
+"""Canonical data types for GuardrailsBench.
 
 An ``Item`` is one evaluation unit: the conversation that reaches the guardrail,
 the model response that comes back, and the ground-truth label. A guardrail is

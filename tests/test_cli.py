@@ -8,9 +8,9 @@ import json
 
 import pytest
 
-from guardrailgym.cli import main
-from guardrailgym.metrics import score
-from guardrailgym.report import (
+from guardrailsbench.cli import main
+from guardrailsbench.metrics import score
+from guardrailsbench.report import (
     DIVIDER,
     HEADER,
     family_table,
@@ -18,7 +18,7 @@ from guardrailgym.report import (
     partial_tag,
     summary_text,
 )
-from guardrailgym.schema import (
+from guardrailsbench.schema import (
     REASON_NOT_EVALUABLE,
     TIER_ADVERSARIAL,
     TIER_CORE,
@@ -53,7 +53,7 @@ def test_leaderboard_ranks_by_gg_score_and_keeps_the_published_header():
     weak = _result(set())
     md = leaderboard_markdown([("weak-system", weak), ("strong-system", strong)])
     lines = md.splitlines()
-    assert lines[0] == "# GuardrailGym leaderboard"
+    assert lines[0] == "# GuardrailsBench leaderboard"
     assert lines[2] == HEADER and lines[3] == DIVIDER
     assert lines[4].startswith("| strong-system"), "best system goes first"
     assert lines[5].startswith("| weak-system")
@@ -113,7 +113,7 @@ def test_validate_command_passes_on_the_shipped_dataset(capsys):
 
 
 def test_validate_command_fails_loudly_on_a_broken_dataset(tmp_path, capsys):
-    from guardrailgym.schema import dump_items
+    from guardrailsbench.schema import dump_items
     broken = [_it("a", "violating", TIER_ADVERSARIAL, "fictional_framing")]
     path = tmp_path / "broken.jsonl"
     dump_items(broken, path)
@@ -152,7 +152,7 @@ def test_leaderboard_command_renders_a_file(seed_csv, tmp_path):
                  "--reports", str(tmp_path / "reports"), "--folds", "3",
                  "--systems", "keyword-v1", "CONTROL-length-stump"]) == 0
     md = out.read_text()
-    assert md.startswith("# GuardrailGym leaderboard")
+    assert md.startswith("# GuardrailsBench leaderboard")
     assert "keyword-v1" in md and "CONTROL-length-stump" in md
 
 
@@ -167,7 +167,7 @@ def test_unknown_system_is_rejected():
 
 
 def test_provenance_footer_states_the_operating_point_and_fitting():
-    from guardrailgym.report import provenance
+    from guardrailsbench.report import provenance
     cv = provenance("data/test.jsonl", 1300, 0.05)
     assert "cluster-disjoint 5-fold" in cv and "5%" in cv
     assert "incumbent-replay" in cv, "the missing row has to be explained"
@@ -184,7 +184,7 @@ def test_leaderboard_renders_the_footer_only_when_given_one():
 
 
 def test_provenance_reflects_whether_the_incumbent_actually_ran():
-    from guardrailgym.report import provenance
+    from guardrailsbench.report import provenance
     absent = provenance("data/test.jsonl", 1300, 0.05)
     assert "is absent" in absent
     present = provenance("data/test.jsonl", 1300, 0.05,
@@ -193,7 +193,7 @@ def test_provenance_reflects_whether_the_incumbent_actually_ran():
 
 
 def test_effective_n_note_only_fires_on_thin_tiers():
-    from guardrailgym.report import effective_n_note
+    from guardrailsbench.report import effective_n_note
     assert effective_n_note({"core": {"items": 234, "distinct": 234, "clusters": 230}}) == ""
     thin = effective_n_note({"hard_negative": {"items": 200, "distinct": 33,
                                                "clusters": 4}})

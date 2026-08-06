@@ -1,6 +1,6 @@
 """Regression tests for the two scoring bugs found during development."""
-from guardrailgym.metrics import robustness_delta, score
-from guardrailgym.schema import Decision, Item, Trace
+from guardrailsbench.metrics import robustness_delta, score
+from guardrailsbench.schema import Decision, Item, Trace
 
 
 def _it(iid, label, tier, fam=None):

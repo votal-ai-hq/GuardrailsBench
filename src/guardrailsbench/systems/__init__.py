@@ -1,6 +1,6 @@
 """Guardrail registry.
 
-Register a system here and it becomes available to ``python -m guardrailgym eval
+Register a system here and it becomes available to ``python -m guardrailsbench eval
 --system <name>`` and to the leaderboard. Entries are factories, not instances,
 because cross-validation fits a fresh copy per fold.
 """

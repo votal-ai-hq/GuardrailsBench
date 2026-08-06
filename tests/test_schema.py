@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from guardrailgym.schema import (
+from guardrailsbench.schema import (
     REASON_NOT_EVALUABLE,
     TIER_ADVERSARIAL,
     Decision,

@@ -99,7 +99,7 @@ stages, nearest-rank. Only p95 feeds the score.
 
 ## Effective sample size
 
-`guardrailgym validate` prints items, distinct renderings, and clusters per
+`guardrailsbench validate` prints items, distinct renderings, and clusters per
 tier, and the leaderboard footer repeats it for any tier under 20 clusters. A
 rate is only as precise as the number of distinct things it was measured over,
 and a templated tier inflates the raw count. On the committed test split the
@@ -108,7 +108,7 @@ hard-negative tier is 200 items, 33 distinct strings, 4 clusters — read
 
 ## Dataset gates
 
-`guardrailgym validate` fails a dataset that has regressed on any of these:
+`guardrailsbench validate` fails a dataset that has regressed on any of these:
 
 | gate | threshold | the failure it is for |
 |---|---|---|

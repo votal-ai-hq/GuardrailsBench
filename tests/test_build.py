@@ -10,7 +10,7 @@ import random
 
 import pytest
 
-from guardrailgym.build import (
+from guardrailsbench.build import (
     build,
     cluster,
     ingest,
@@ -19,8 +19,8 @@ from guardrailgym.build import (
     make_hard_negatives,
     split,
 )
-from guardrailgym.pack import load_pack
-from guardrailgym.schema import (
+from guardrailsbench.pack import load_pack
+from guardrailsbench.schema import (
     LABEL_ALLOWED,
     LABEL_VIOLATING,
     TIER_ADVERSARIAL,
@@ -28,7 +28,7 @@ from guardrailgym.schema import (
     TIER_HARD_NEGATIVE,
     Item,
 )
-from guardrailgym.validate import shortcut_auc, validate_dataset, validate_splits
+from guardrailsbench.validate import shortcut_auc, validate_dataset, validate_splits
 
 
 @pytest.fixture(scope="module")
@@ -141,7 +141,7 @@ def test_build_end_to_end(seed_csv, tmp_path):
 
 
 def test_build_output_passes_validation(seed_csv, tmp_path):
-    from guardrailgym.schema import load_items
+    from guardrailsbench.schema import load_items
     build(seed_csv, str(tmp_path), per_family=12, n_hard_neg=40)
     items = load_items(tmp_path / "all.jsonl")
     problems = [p for p in validate_dataset(items)
